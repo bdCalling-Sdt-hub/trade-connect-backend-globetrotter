@@ -1,9 +1,12 @@
 
 <?php
 
+use App\Http\Controllers\Api\LikeController;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\Api\NewsFeedController;
+use App\Http\Controllers\Api\SocketController;
 
 Route::group([
     'middleware' => ['api'],
@@ -25,3 +28,18 @@ Route::group([
     Route::post('/updatePassword', 'updatePassword')->middleware('jwt.auth');
     Route::post('/profile', 'profile')->middleware('jwt.auth');
 });
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::get('/newsfeeds', [NewsFeedController::class, 'index']);
+    Route::post('/newsfeeds', [NewsFeedController::class, 'store']);
+    Route::get('/newsfeeds/{id}', [NewsFeedController::class, 'show']);
+    Route::put('/updateNewsfeeds/{id}', [NewsFeedController::class, 'update']);
+    Route::delete('/newsfeeds/{id}', [NewsFeedController::class, 'destroy']);
+});
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
+    Route::post('unlike-newsfeed', [LikeController::class, 'unlikeNewsfeed']);
+});
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('trigger-event', [SocketController::class, 'triggerEvent']);
+});
+
