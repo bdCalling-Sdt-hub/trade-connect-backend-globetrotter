@@ -14,29 +14,17 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
+  io.on('connection', (socket) => {
+      console.log('A user connected: ' + socket.id);
 
-app.post('/trigger-event', (req, res) => {
-  const { event, data } = req.body;
-  console.log('Received event:', event, 'with data:', data);
-  io.emit(event, data);
-  res.status(200).send('Event triggered');
-});
-
-app.post('/trigger-like', (req, res) => {
-    const { newsfeed_id, user_id } = req.body;
-    console.log('Triggering like event for newsfeed:', newsfeed_id, 'by user:', user_id);
-    io.emit('like', { newsfeed_id, user_id });
-    res.status(200).send('Like event triggered');
-  });
-
-  app.post('/trigger-unlike', (req, res) => {
-    const { newsfeed_id, user_id } = req.body;
-    console.log('Triggering unlike event for newsfeed:', newsfeed_id, 'by user:', user_id);
-    io.emit('unlike', { newsfeed_id, user_id });
-    res.status(200).send('Unlike event triggered');
-  });
-io.on('connection', (socket) => {
-  console.log('A user connected: ' + socket.id);
+      socket.on('message', (message) => {
+            console.log('Message received:', message);
+            io.emit('message', message);
+        });
+        socket.on('reply', (message) => {
+            console.log('Message Reply:', message);
+            io.emit('reply', message);
+        });
 
   // Listen for events
   socket.on('disconnect', () => {

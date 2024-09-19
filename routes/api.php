@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\LikeController;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\NewsFeedController;
 use App\Http\Controllers\Api\SocketController;
 
@@ -37,9 +38,11 @@ Route::group(['middleware' => ['api', 'jwt.auth']], function () {
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
-    Route::post('unlike-newsfeed', [LikeController::class, 'unlikeNewsfeed']);
 });
+
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
-    Route::post('trigger-event', [SocketController::class, 'triggerEvent']);
+    Route::post('comment', [CommentController::class, 'store']);
+    Route::delete('comment/{id}', [CommentController::class, 'destroy']);
+
 });
 
