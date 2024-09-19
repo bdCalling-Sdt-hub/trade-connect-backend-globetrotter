@@ -16,11 +16,10 @@ return new class extends Migration
             $table->foreignId('newsfeed_id');
             $table->foreignId('user_id');
             $table->text('comments');
-            $table->foreignId('reply_id')->nullable();
+            $table->foreignId('parent_id')->nullable();
             $table->timestamps();
         });
     }
-
 
     /**
      * Reverse the migrations.
