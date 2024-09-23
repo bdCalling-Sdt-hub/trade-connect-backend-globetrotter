@@ -16,4 +16,8 @@ class NewsFeed extends Model
         'privacy',
         'status',
     ];
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
 }

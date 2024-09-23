@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\GroupController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NewsFeedController;
 use App\Http\Controllers\Api\SocketController;
 
@@ -39,10 +41,24 @@ Route::group(['middleware' => ['api', 'jwt.auth']], function () {
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
 });
-
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('comment', [CommentController::class, 'store']);
-    Route::delete('comment/{id}', [CommentController::class, 'destroy']);
-
+    Route::get('commentView/{newsfeedId}', [CommentController::class, 'commentView']);
+    Route::delete('commentDelete/{id}', [CommentController::class, 'destroy']);
 });
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('messageSend', [MessageController::class, 'store']);
+    Route::delete('deleteMessage/{id}', [MessageController::class, 'destroy']);
+    Route::get('messageView/{id}', [MessageController::class, 'view']);
+});
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('groups', [GroupController::class, 'store']);
+    Route::get('groups', [GroupController::class, 'index']);
+    Route::put('groups/{id}', [GroupController::class, 'update']);
+    Route::delete('groups/{id}', [GroupController::class, 'destroy']);
+
+    Route::post('groups/{group}/members', [GroupController::class, 'addMember']);
+    Route::delete('groups/{group}/members/{user}', [GroupController::class, 'removeMember']);
+});
+
 

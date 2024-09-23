@@ -17,8 +17,7 @@ class User extends Authenticatable implements JWTSubject
      * @var array
      */
     protected $fillable = [
-        'first_name',
-        'last_name',
+        'full_name',
         'email',
         'password',
         'verify_email',
@@ -30,6 +29,7 @@ class User extends Authenticatable implements JWTSubject
         'role',
         'google_id',
         'facebook_id',
+        'is_active',
         'status',
     ];
     protected $casts = [
@@ -78,24 +78,6 @@ class User extends Authenticatable implements JWTSubject
     {
         return [];
     }
-    public function getFirstNameAttribute($value)
-    {
-        return ucfirst($value);
-    }
-    public function setFirstNameAttribute($value)
-    {
-        $this->attributes['first_name'] = strtolower($value);
-    }
-    public function getLastNameAttribute($value)
-    {
-        return ucfirst($value);
-    }
-    public function setLastNameAttribute($value)
-    {
-        $this->attributes['last_name'] = strtolower($value);
-    }
-    public function getFullNameAttribute()
-    {
-        return ucfirst($this->first_name) . ' ' . ucfirst($this->last_name);
-    }
+
+
 }
