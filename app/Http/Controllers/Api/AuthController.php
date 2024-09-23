@@ -247,4 +247,37 @@ class AuthController extends Controller
             'expires_in' => auth()->factory()->getTTL() * 60
         ];
     }
+
+
+    /*
+    ----------------------------------------
+               Admin Dashboard
+    ----------------------------------------
+    */
+
+    public function updateRole(Request $request, $id)
+    {
+        $authUser = auth()->user();
+        $userToUpdate = User::find($id);
+
+        if (!$userToUpdate) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+        $userToUpdate->role = $request->role;
+        $userToUpdate->save();
+
+        return response()->json(['message' => 'User role updated successfully.', 'user' => $userToUpdate]);
+    }
+
+    public function deleteUser($id)
+    {
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+        $user->delete();
+        return response()->json(['message' => 'User deleted successfully.']);
+    }
+
+
 }

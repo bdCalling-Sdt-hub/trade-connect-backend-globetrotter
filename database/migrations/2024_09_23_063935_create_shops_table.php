@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('group_messages', function (Blueprint $table) {
+        Schema::create('shops', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('group_id');
-            $table->foreignId('sender_id');
-            $table->text('message');
-            $table->string('images')->nullable();
-            $table->boolean('is_read')->default(false);
+            $table->foreignId('user_id')->constrained()->onDelete('cascade'); // Foreign key to users table
+            $table->string('shop_name'); // Shop name
+            $table->string('logo')->nullable(); // Logo, nullable
+            $table->boolean('status')->default(true); // Status, default to true
             $table->timestamps();
         });
     }
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('group_messages');
+        Schema::dropIfExists('shops');
     }
 };
