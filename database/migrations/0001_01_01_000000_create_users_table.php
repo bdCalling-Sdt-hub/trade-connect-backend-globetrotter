@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('first_name');
-            $table->string('last_name');
+            $table->string('full_name');
             $table->string('email')->unique();
             $table->string('password');
             $table->boolean('verify_email');
@@ -26,6 +25,7 @@ return new class extends Migration
             $table->string('role');
             $table->string('google_id')->nullable();
             $table->string('facebook_id')->nullable();
+            $table->boolean('is_active')->nullable();
             $table->string('status')->default('active');
             $table->rememberToken();
             $table->timestamps();
