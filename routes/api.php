@@ -41,6 +41,8 @@ Route::group([
     Route::get('/user', 'user')->middleware('jwt.auth');
     Route::post('/updatePassword', 'updatePassword')->middleware('jwt.auth');
     Route::put('/profile', 'profile')->middleware('jwt.auth');
+    Route::patch('/isActive', 'isActive')->middleware('jwt.auth');
+    Route::patch('/noActive', 'noActive')->middleware('jwt.auth');
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::get('/newsfeeds', [NewsFeedController::class, 'index']);

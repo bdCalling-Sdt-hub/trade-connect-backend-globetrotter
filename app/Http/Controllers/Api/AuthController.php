@@ -273,6 +273,22 @@ class AuthController extends Controller
 
         return $this->sendResponse($user, 'Profile updated successfully.');
     }
+    public function isActive()
+    {
+        $user = Auth::user();
+        $user->is_active = true;
+        $user->save();
+
+        return $this->sendResponse($user, 'User active status updated successfully.');
+    }
+    public function noActive()
+    {
+        $user = Auth::user();
+        $user->is_active = false;
+        $user->save();
+
+        return $this->sendResponse($user, 'User no active status updated successfully.');
+    }
     protected function respondWithToken($token)
     {
         return [
