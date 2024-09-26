@@ -4,21 +4,29 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\NewsFeed;
+use App\Models\User;
+use App\Notifications\NewsFeedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
 
+
 class NewsFeedController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+        $followingIds = $user->following()->pluck('users.id')->toArray();
         $newsFeeds = NewsFeed::where('privacy', 'public')
             ->orWhere('user_id', Auth::id())
+            ->orWhereIn('user_id', $followingIds)
             ->get();
-            return $this->sendResponse($newsFeeds, 'Successfully get all news feed.');
+
+        return $this->sendResponse($newsFeeds, 'Successfully retrieved news feed.');
     }
+
     public function store(Request $request)
     {
     $validator = Validator::make($request->all(), [
@@ -46,20 +54,10 @@ class NewsFeedController extends Controller
         'privacy' => $request->privacy,
         'status' => $request->status,
     ]);
+    $user = User::find($newsFeed->user_id);
+    $user->notify(new NewsFeedNotification($newsFeed));
     return $this->sendResponse($newsFeed, 'Successfully created news feed.');
 }
-
-    public function show($id)
-    {
-        $newsFeed = NewsFeed::find($id);
-        if (!$newsFeed) {
-            return $this->sendError('News feed not found', [], 404);
-        }
-        if ($newsFeed->privacy == 'private' && $newsFeed->user_id !== Auth::id()) {
-            return $this->sendError('Unauthorized access', [], 403);
-        }
-        return $this->sendResponse($newsFeed, 'News feed retrieved successfully.');
-    }
     public function update(Request $request, $id)
     {
         $newsFeed = NewsFeed::find($id);
@@ -96,6 +94,8 @@ class NewsFeedController extends Controller
         $newsFeed->privacy = $request->privacy ?? $newsFeed->privacy;
         $newsFeed->save();
 
+        $user = User::find($newsFeed->user_id);
+        $user->notify(new NewsFeedNotification($newsFeed));
         return $this->sendResponse($newsFeed, 'News feed updated successfully.');
     }
     public function destroy($id)
@@ -117,5 +117,21 @@ class NewsFeedController extends Controller
         $newsFeed->delete();
 
         return $this->sendResponse([], 'News feed deleted successfully.');
+    }
+    public function count(){
+        $userId = Auth::id();
+        $count = NewsFeed::where('user_id', $userId)->count();
+        if(!$count){
+            return $this->sendError([],"No NewsFeed Found.");
+        }
+        return $this->sendResponse($count, 'Newsfeeds count retrieved successfully.');
+    }
+
+    public function usernewsfeeds()
+    {
+        $userId = Auth::id();
+        $newsfeeds = NewsFeed::where('user_id', $userId)->get();
+
+        return $this->sendResponse($newsfeeds, 'User newsfeeds retrieved successfully.');
     }
 }

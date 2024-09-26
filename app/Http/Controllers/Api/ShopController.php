@@ -55,7 +55,7 @@ class ShopController extends Controller
 
     public function update(Request $request, $id)
     {
-        return $request;
+        // return $request;
         $shop = Shop::find($id);
         if (!$shop) {
             return $this->sendError('Shop not found', [], 404);

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Like;
+use App\Models\User;
+use App\Notifications\LikeNotification;
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,10 +30,12 @@ class LikeController extends Controller
             $existingLike->delete();
             return $this->sendResponse([], "Like successfully removed.");
         } else {
-            $like = Like::create([
+            $like = Like::create(attributes: [
                 'newsfeed_id' => $request->newsfeed_id,
                 'user_id' => Auth::id(),
             ]);
+            $user = User::find($like->user_id);
+            $user->notify(new LikeNotification($like));
             return $this->sendResponse($like, "Like successfully added.");
         }
 

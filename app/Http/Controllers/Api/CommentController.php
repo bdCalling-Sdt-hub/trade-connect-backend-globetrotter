@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
+use App\Models\User;
+use App\Notifications\CommentNotification;
+use App\Notifications\CommentReplyNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -31,6 +34,15 @@ class CommentController extends Controller
 
             // Load user and replies for the response
             $comment->load('user', 'replies');
+
+            if ($request->parent_id) {
+                $parentComment = Comment::find($request->parent_id);
+                $parentUser = User::find($parentComment->user_id);
+                $parentUser->notify(new CommentReplyNotification($comment));
+            }
+
+            $newsFeedOwner = User::find($comment->user_id);
+            $newsFeedOwner->notify(new CommentNotification($comment));
 
             return $this->sendResponse($comment, 'Comment added successfully.');
         } catch (\Exception $e) {

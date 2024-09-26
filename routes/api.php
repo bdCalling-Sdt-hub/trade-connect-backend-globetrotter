@@ -1,19 +1,26 @@
 
 <?php
 
+use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\LikeController;
+use App\Http\Controllers\Api\LoveController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\ShopController;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CommentController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NewsFeedController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SocketController;
+use App\Http\Controllers\Api\TermAndConditioncontroller;
 
 Route::group([
     'middleware' => ['api'],
@@ -33,14 +40,15 @@ Route::group([
     Route::post('/logout', 'logout')->middleware('jwt.auth');
     Route::get('/user', 'user')->middleware('jwt.auth');
     Route::post('/updatePassword', 'updatePassword')->middleware('jwt.auth');
-    Route::post('/profile', 'profile')->middleware('jwt.auth');
+    Route::put('/profile', 'profile')->middleware('jwt.auth');
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::get('/newsfeeds', [NewsFeedController::class, 'index']);
     Route::post('/newsfeeds', [NewsFeedController::class, 'store']);
-    Route::get('/newsfeeds/{id}', [NewsFeedController::class, 'show']);
     Route::put('/updateNewsfeeds/{id}', [NewsFeedController::class, 'update']);
     Route::delete('/newsfeeds/{id}', [NewsFeedController::class, 'destroy']);
+    Route::get('/newsfeedsCount', [NewsFeedController::class, 'count']);
+    Route::get('/usernewsfeeds', [NewsFeedController::class, 'usernewsfeeds']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
@@ -85,6 +93,7 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
 });
 Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::apiResource('products', ProductController::class);
+    Route::get('userproducts', [ProductController::class, 'userproducts']);
     Route::post('approved/{id}', [ProductController::class, 'approved']);
     Route::post('canceled/{id}', [ProductController::class, 'canceled']);
     Route::post('pending/{id}', [ProductController::class, 'pending']);
@@ -93,4 +102,27 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::post('users/{id}/role', [AuthController::class, 'updateRole']);
     Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
 });
-
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::apiResource('love', LoveController::class);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('activeUser', [DashboardController::class,'activeUser']);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::put('personalInformation', [SettingController::class,'personalInformation']);
+    Route::apiResource('faqs',FaqController::class);
+    Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'getAllNotifications']);
+    Route::get('/notifications/unread', [NotificationController::class, 'getUnreadNotifications']);
+    Route::post('/notifications/read/{id}', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('/search', [SearchController::class, 'search']);
+    Route::get('/all', [SearchController::class, 'all']);
+    Route::get('/post', [SearchController::class, 'newsfeed']);
+    Route::get('/product', [SearchController::class, 'products']);
+    Route::get('/people', [SearchController::class, 'peoples']);
+});
