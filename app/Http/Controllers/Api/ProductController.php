@@ -4,7 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Shop;
+use App\Models\User;
+use App\Notifications\ProductApprovedNotification;
+use App\Notifications\ProductCanceledNotification;
+use App\Notifications\ProductNotification;
+use App\Notifications\ProductPendingNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 class ProductController extends Controller
@@ -63,6 +70,16 @@ class ProductController extends Controller
             'status' => $request->status,
         ]);
 
+        $adminUser = User::where('role', 'ADMIN')
+            ->where('status', 'active')
+            ->where('verify_email', 1)
+            ->first();
+
+        if (!$adminUser) {
+            return $this->sendError([], "No Admin Users Found.");
+        }
+        $adminUser->notify(new ProductNotification($product));
+
         return response()->json(['data' => $product, 'message' => 'Product created successfully.'], 201);
     }
     private function generateUniqueProductCode($userId)
@@ -89,8 +106,8 @@ class ProductController extends Controller
 
         $validator = Validator::make($request->all(), [
             'product_name' => 'sometimes|required|string|max:255',
-            'price' => 'sometimes|required|numeric|min:0',
-            'product_code' => 'sometimes|required|string|unique:products,product_code,' . $id,
+            'price' => 'required|numeric|min:0',
+            'product_code' =>'required|string|unique:products,product_code,' . $id,
             'description' => 'nullable|string',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
@@ -161,10 +178,16 @@ class ProductController extends Controller
         $product->status = 'approved';
         $product->save();
 
+        $user = $product->shop->user;
+
+        if (!$user) {
+            return $this->sendError('Shop owner not found', [], 404);
+        }
+        $user->notify(new ProductApprovedNotification($product));
+
         return response()->json(['message' => 'Product approved successfully'], 200);
     }
 
-    // Cancel a product
     public function canceled($id)
     {
         $product = Product::find($id);
@@ -173,6 +196,12 @@ class ProductController extends Controller
         }
         $product->status = 'canceled';
         $product->save();
+
+        $user = $product->shop->user;
+        if (!$user) {
+            return $this->sendError('Shop owner not found', [], 404);
+        }
+        $user->notify(new ProductCanceledNotification($product));
 
         return response()->json(['message' => 'Product canceled successfully'], 200);
     }
@@ -187,6 +216,26 @@ class ProductController extends Controller
         $product->status = 'pending';
         $product->save();
 
+        $user = $product->shop->user;
+        if (!$user) {
+            return $this->sendError('Shop owner not found', [], 404);
+        }
+        $user->notify(new ProductPendingNotification($product));
+
         return response()->json(['message' => 'Product marked as pending'], 200);
+    }
+    public function userproducts()
+    {
+        $userId = Auth::id();
+        $shop = Shop::where('user_id', $userId)->first();
+        if (!$shop) {
+            return $this->sendError([], "No shop found for the authenticated user.");
+        }
+        $products = Product::where('shop_id', $shop->id)->get();
+        if (!$products) {
+            return $this->sendError([], "No products found for the shop.");
+        }
+
+        return $this->sendResponse($products, 'User products retrieved successfully.');
     }
 }

@@ -12,4 +12,13 @@ class Like extends Model
         "user_id",
         "newsfeed_id",
     ];
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function newsfeed()
+    {
+        return $this->belongsTo(NewsFeed::class);
+    }
 }

@@ -37,14 +37,14 @@ class FollowController extends Controller
 
     public function followersList(Request $request)
     {
-        $followers = auth()->user()->followers;
+        $followers = auth()->user()->followers->count();
 
         return $this->sendResponse($followers, 'Followers retrieved successfully.');
     }
 
     public function followingList(Request $request)
     {
-        $following = auth()->user()->following;
+        $following = auth()->user()->following->count();
 
         return $this->sendResponse($following, 'Following retrieved successfully.');
     }

@@ -239,6 +239,40 @@ class AuthController extends Controller
 
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }
+
+    public function profile(Request $request)
+    {
+        $user = Auth::user();
+        if(!$user){
+            return $this->sendError([],"You are not user.");
+        }
+        $validator = Validator::make($request->all(), [
+            'full_name' => 'nullable|required|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
+        }
+
+        if ($request->hasFile('image')) {
+            if ($user->image) {
+                $oldImagePath = public_path('profile/' . $user->image);
+                if (file_exists($oldImagePath)) {
+                    unlink($oldImagePath);
+                }
+            }
+
+            $image = $request->file('image');
+            $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('profile'), $fileName);
+        }
+        $user->full_name = $request->full_name ?? $user->full_name;
+        $user->image = $fileName;
+        $user->save();
+
+        return $this->sendResponse($user, 'Profile updated successfully.');
+    }
     protected function respondWithToken($token)
     {
         return [
