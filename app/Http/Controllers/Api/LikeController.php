@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Like;
+use App\Models\NewsFeed;
 use App\Models\User;
 use App\Notifications\LikeNotification;
 use GuzzleHttp\Client;
@@ -23,7 +24,7 @@ class LikeController extends Controller
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
         $existingLike = Like::where('newsfeed_id', $request->newsfeed_id)
-                            ->where('user_id', Auth::id())
+                            ->where('user_id', $request->user_id)
                             ->first();
 
         if ($existingLike) {
@@ -32,7 +33,7 @@ class LikeController extends Controller
         } else {
             $like = Like::create(attributes: [
                 'newsfeed_id' => $request->newsfeed_id,
-                'user_id' => Auth::id(),
+                'user_id' => $request->user_id,
             ]);
             $user = User::find($like->user_id);
             $user->notify(new LikeNotification($like));
@@ -40,6 +41,25 @@ class LikeController extends Controller
         }
 
     }
+    public function getNewsfeedLikes()
+    {
+        $newsfeeds = NewsFeed::all();
+
+        $newsfeedsLikes = [];
+        foreach ($newsfeeds as $newsfeed) {
+            $likes = Like::where('newsfeed_id', $newsfeed->id)->get();
+
+            $newsfeedsLikes[] = [
+                'newsfeed_id' => $newsfeed->id,
+                'likes' => $likes
+            ];
+        }
+        if (empty($newsfeedsLikes)) {
+            return $this->sendError("No newsfeed likes found.");
+        }
+        return $this->sendResponse($newsfeedsLikes, 'Likes for all newsfeeds retrieved successfully.');
+    }
+
 
 }
 

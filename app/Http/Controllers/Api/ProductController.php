@@ -19,19 +19,33 @@ class ProductController extends Controller
     public function index()
     {
         try {
-            $userId = auth()->user()->id;
-
-            $products = Product::whereHas('shop', function ($query) use ($userId) {
-                $query->where('user_id', $userId);
-            })->where('status', 'approved')
-              ->with(['shop', 'category'])
-              ->get();
+            $products = Product::with(['shop.user', 'category'])
+                ->where('status', 'approved')
+                ->get();
+            $products = $products->map(function ($product) {
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'category_name' => $product->category->category_name,
+                    'product_price' => $product->price,
+                    'product_code' => $product->product_code,
+                    'product_description' => $product->description,
+                    'product_status' => $product->status,
+                    'images' => json_decode($product->images),
+                    'shop' => [
+                        'shop_name' => $product->shop->shop_name,
+                        'seller_name' => $product->shop->user->full_name,
+                    ],
+                ];
+            });
 
             return $this->sendResponse($products, 'Products retrieved successfully.');
         } catch (\Exception $e) {
             return $this->sendError('Error retrieving products', ['error' => $e->getMessage()], 500);
         }
     }
+
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -100,14 +114,15 @@ class ProductController extends Controller
         if (!$product) {
             return response()->json(['message' => 'Product not found.'], 404);
         }
-        if ($product->shop->user_id !== auth()->user()->id || $product->status !== 'approved') {
-            return response()->json(['message' => 'Unauthorized or product not approved.'], 403);
+        if ($product->status !== 'approved') {
+            return response()->json(['message' => 'product not approved.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
-            'product_name' => 'sometimes|required|string|max:255',
+            'product_name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
-            'product_code' =>'required|string|unique:products,product_code,' . $id,
+            'product_code' =>'max:255|required|string|unique:products,product_code,' . $id,
+            'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
             'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
@@ -137,12 +152,12 @@ class ProductController extends Controller
         }
 
         $product->update([
+            'category_id'=>$request->category_id ?? $product->category_id,
             'product_name' => $request->product_name ?? $product->product_name,
             'price' => $request->price ?? $product->price,
             'product_code' => $request->product_code ?? $product->product_code,
             'description' => $request->description ?? $product->description,
             'images' => json_encode($newImageUrls),
-            'status' => $request->status ?? $product->status,
         ]);
 
         return response()->json(['data' => $product, 'message' => 'Product updated successfully.']);
@@ -224,18 +239,77 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product marked as pending'], 200);
     }
+    public function productList()
+    {
+        try {
+            $products = Product::with(['shop.user', 'category'])
+                ->orderBy('id', 'DESC')
+                ->paginate(10);
+
+            $formattedProducts = $products->getCollection()->map(function ($product) {
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'product_category' => $product->category->category_name,
+                    'price' => $product->price,
+                    'product_status' => $product->status,
+                    'description' => $product->description,
+                    'images' => json_decode($product->images),
+                    'shop' => [
+                        'shop_name' => $product->shop->shop_name,
+                        'seller' => [
+                            'seller_name' => $product->shop->user->full_name,
+                        ],
+                    ],
+                ];
+            });
+
+            $paginatedData = $products->setCollection($formattedProducts);
+
+            return $this->sendResponse($paginatedData, 'Product list retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->sendError('Error retrieving product list', ['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function userproducts()
     {
         $userId = Auth::id();
         $shop = Shop::where('user_id', $userId)->first();
+
         if (!$shop) {
             return $this->sendError([], "No shop found for the authenticated user.");
         }
-        $products = Product::where('shop_id', $shop->id)->get();
-        if (!$products) {
-            return $this->sendError([], "No products found for the shop.");
-        }
 
-        return $this->sendResponse($products, 'User products retrieved successfully.');
+        $products = Product::where('shop_id', $shop->id)
+            ->where('status', 'approved')
+            ->with(['category', 'shop.user'])
+            ->get();
+
+        if ($products->isEmpty()) {
+            return $this->sendError([], "No approved products found for the shop.");
+        }
+        $formattedProducts = $products->map(function ($product) {
+            return [
+                'id' => $product->id,
+                'product_name' => $product->product_name,
+                'category_name' => $product->category->category_name,
+                'product_code' => $product->product_code,
+                'price' => $product->price,
+                'description' => $product->description,
+                'images' => json_decode($product->images),
+
+                'shop' => [
+                    'shop_name' => $product->shop->shop_name,
+                    'seller' => [
+                        'seller_name' => $product->shop->user->full_name,
+                    ],
+                ],
+            ];
+        });
+
+        return $this->sendResponse($formattedProducts, 'Approved products retrieved successfully.');
     }
+
+
 }

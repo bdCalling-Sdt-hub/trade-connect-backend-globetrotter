@@ -11,9 +11,24 @@ class ShopController extends Controller
 {
     public function index()
     {
-        $shops = Shop::with('user')->get(); // Eager load user relationship
-        return $this->sendResponse($shops, 'Shops retrieved successfully.');
+        try {
+            $shops = Shop::with('user')->get();
+            $formattedShops = $shops->map(function ($shop) {
+                return [
+                    'id'=>$shop->id,
+                    'shop_name' => $shop->shop_name,
+                    'seller' => [
+                        'seller_name' => $shop->user->full_name,
+                    ],
+                ];
+            });
+
+            return $this->sendResponse($formattedShops, 'Shops retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->sendError('Error retrieving shops', ['error' => $e->getMessage()], 500);
+        }
     }
+
 
     public function store(Request $request)
     {

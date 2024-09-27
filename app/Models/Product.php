@@ -23,9 +23,13 @@ class Product extends Model
         return $this->belongsTo(Shop::class);
     }
 
-    // Relationship to Category
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class); // Assuming each product belongs to a user
     }
 }

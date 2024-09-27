@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('google_id')->nullable();
             $table->string('facebook_id')->nullable();
             $table->boolean('is_active')->nullable();
-            $table->string('status')->default('active');
+            $table->string('status')->default('inactive')->comment('active, inactive');
             $table->rememberToken();
             $table->timestamps();
         });

@@ -20,7 +20,7 @@ let comments = {};
 
 io.on('connection', (socket) => {
     console.log('A user connected: ' + socket.id);
-
+    //Active user
     socket.on('is_active', (user) => {
         const { is_active, user_id } = user;
         // console.log(`User is active in chat: ${is_active}, user ID: ${user_id}`);
@@ -35,11 +35,23 @@ io.on('connection', (socket) => {
             console.log(`User ${user_id} marked as inactive. Active users: ${Array.from(activeUsersInChat)}`);
             io.emit('userStatusUpdate', { user_id, status: 'inactive' });
         }
-
-        // Emit the updated list of active users
         io.emit('activeUsers', Array.from(activeUsersInChat));
     });
+     // Notification for status changes (approved, canceled, pending)
+     socket.on('statusChange', (data) => {
+        const { userId, status } = data;
+        console.log(`Status change for User ${userId}: ${status}`);
 
+        io.emit('statusNotification', { userId, status });
+    });
+    //newsfeedCreate
+    socket.on('newsfeedCreate', (data) => {
+        const { newsfeedId, userId, content } = data;
+        console.log(`New newsfeed created by User ${userId}: Newsfeed ID = ${newsfeedId}, Content = ${content}`);
+
+        io.emit('newsfeedNotification', { newsfeedId, userId, content });
+    });
+    //like
     socket.on('like', (data) => {
         const { postId, userId } = data;
         if (!postLikes[postId]) {
@@ -57,6 +69,7 @@ io.on('connection', (socket) => {
         const likeCount = postLikes[postId].size;
         io.emit('likeUpdate', { postId, likeCount, totalLikes });
     });
+    //comment
     socket.on('addComment', (data) => {
         const { newsfeedId, userId, comment, parentId = null } = data;
         const newComment = {
@@ -73,6 +86,7 @@ io.on('connection', (socket) => {
         console.log("New Comment Added:", newComment);
         io.emit('commentUpdate', { newsfeedId, comments: comments[newsfeedId] });
     });
+    //reply
     socket.on('addReply', (data) => {
         const { newsfeedId, parentId, userId, reply } = data;
 
@@ -90,27 +104,62 @@ io.on('connection', (socket) => {
         console.log("New Reply Added:", newReply);
         io.emit('commentUpdate', { newsfeedId, comments: comments[newsfeedId] });
     });
+    //message
     socket.on('message', (message) => {
       console.log(`Message : ${message}`);
       io.emit("message",message)
   });
+    //join Room
     socket.on('joinRoom', (room) => {
         socket.join(room);
         console.log(`User ${socket.id} joined room: ${room.room}`);
         socket.to(room).emit('message', `User ${socket.id} has joined the room.`);
     });
+    //Leave Room
     socket.on('leaveRoom', (room) => {
         socket.leave(room);
         console.log(`User ${socket.id} left room: ${room.room}`);
         socket.to(room).emit('message', `User ${socket.id} has left the room.`);
     });
+    //Room Message
     socket.on('roomMessage', ({ room, message }) => {
         console.log(`Message to room  ${room}: ${message}`);
         io.to(room).emit('roomMessage', { user: socket.id, message });
     });
+    // 1. Sending an offer from one peer to another
+    socket.on('offer', (data) => {
+        const { room, offer } = data;
+        console.log(`Offer sent to room ${room}:${offer.type} ${offer.sdp}`);
+        socket.to(room).emit('offer', offer);
+    });
+
+    // 2. Sending an answer in response to an offer
+    socket.on('answer', (data) => {
+        const { room, answer } = data;
+        console.log(`Answer sent to room ${room}: ${answer.type} ${answer.sdp}`);
+        socket.to(room).emit('answer', answer);
+    });
+
+    // 3. Sending ICE candidates
+    socket.on('ice-candidate', (data) => {
+        const { room, candidate } = data;
+        console.log(`ICE candidate sent to room ${room}: ${candidate.candidate}`);
+        socket.to(room).emit('ice-candidate', candidate);
+    });
+
+    // WebRTC Audio/Video Calls and Room-Based Audio/Video Calls
+    socket.on('roomAudioCall', (room) => {
+        console.log(`Audio call initiated in room: ${room.room}`);
+        io.to(room).emit('roomAudioCall', `Audio call initiated in room: ${room}`);
+    });
+
+    socket.on('roomVideoCall', (room) => {
+        console.log(`Video call initiated in room: ${room.room}`);
+        io.to(room).emit('roomVideoCall', `Video call initiated in room: ${room}`);
+    });
     socket.on('disconnect', () => {
         console.log('User disconnected: ' + socket.id);
-
+//Disconnect user
         for (const userId of activeUsersInChat) {
             userStatus[userId] = 'inactive';
             activeUsersInChat.delete(userId);

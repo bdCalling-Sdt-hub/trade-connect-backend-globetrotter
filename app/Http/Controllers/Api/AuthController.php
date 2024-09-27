@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\OtpVerificationMail;
 use App\Mail\SendOtp;
+use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,7 +37,7 @@ class AuthController extends Controller
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|max:60',
             'c_password' => 'required|same:password',
-            'role'       => ['required', Rule::in(['USER', 'ADMIN'])],
+            'role'       => ['required', Rule::in(['MEMBER', 'ADMIN'])],
         ]);
         if ($validator->fails()) {
             return response()->json(['error' => 'Validation Error.', 'messages' => $validator->errors()], 422);
@@ -96,6 +98,7 @@ class AuthController extends Controller
             'verify_email' => 1,
             'otp' => null,
             'otp_expires_at' => null,
+            'status'=>'active'
         ]);
         try {
             if (!$token = JWTAuth::fromUser($user)) {
@@ -307,27 +310,241 @@ class AuthController extends Controller
 
     public function updateRole(Request $request, $id)
     {
-        $authUser = auth()->user();
-        $userToUpdate = User::find($id);
+        try {
+            $authUser = auth()->user();
+            $userToUpdate = User::find($id);
+            if (!$userToUpdate) {
+                return response()->json(['message' => 'User not found.'], 404);
+            }
+            $validator = Validator::make($request->all(), [
+                'role' => 'required|string|in:MEMBER,ADMIN',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['message' => 'Validation error', 'errors' => $validator->errors()], 400);
+            }
+            $userToUpdate->role = $request->role;
+            $userToUpdate->save();
 
-        if (!$userToUpdate) {
-            return response()->json(['message' => 'User not found.'], 404);
+            return response()->json(['message' => 'User role updated successfully.', 'user' => $userToUpdate]);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error updating user role', 'error' => $e->getMessage()], 500);
         }
-        $userToUpdate->role = $request->role;
-        $userToUpdate->save();
-
-        return response()->json(['message' => 'User role updated successfully.', 'user' => $userToUpdate]);
     }
+
 
     public function deleteUser($id)
     {
-        $user = User::find($id);
-        if (!$user) {
-            return response()->json(['message' => 'User not found.'], 404);
+        try {
+            $user = User::find($id);
+            if (!$user) {
+                return response()->json(['message' => 'User not found.'], 404);
+            }
+            $user->delete();
+            return response()->json(['message' => 'User deleted successfully.']);
+
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error deleting user', 'error' => $e->getMessage()], 500);
         }
-        $user->delete();
-        return response()->json(['message' => 'User deleted successfully.']);
     }
+    public function userList()
+    {
+        try {
+            $users = User::where('status','active')->orderBy('id', 'DESC')->paginate(10);
+            $formattedUsers = $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->full_name,
+                    'email' => $user->email,
+                    'image' => $user->image,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                ];
+            });
+            return $this->sendResponse($formattedUsers, 'User list retrieved successfully.');
+
+        } catch (\Exception $e) {
+            return $this->sendError('Error retrieving user list', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function searchUser(Request $request)
+    {
+        try {
+            $request->validate([
+                'query' => 'required|string|min:1',
+            ]);
+
+            $query = $request->input('query');
+            $users = User::where('full_name', 'LIKE', "%{$query}%")
+                ->orWhere('email', 'LIKE', "%{$query}%")
+                ->orderBy('id', 'DESC')
+                ->get();
+
+            $formattedUsers = $users->map(function ($user) {
+                return [
+                    'id' => $user->id,
+                    'full_name' => $user->full_name,
+                    'email' => $user->email,
+                    'image' => $user->image,
+                    'role' => $user->role,
+                    'status' => $user->status,
+                ];
+            });
+            return $this->sendResponse($formattedUsers, 'User search results retrieved successfully.');
+
+        } catch (\Exception $e) {
+            return $this->sendError('Error searching users', ['error' => $e->getMessage()], 500);
+        }
+    }
+    public function userProducts()
+    {
+        $userId = auth()->id();
+
+        // Find the shop associated with the authenticated user
+        $shop = Shop::where('user_id', $userId)->first();
+
+        // Check if the shop exists
+        if (!$shop) {
+            return $this->sendError('Shop not found for the user.', [], 404);
+        }
+
+        // Get products associated with the shop
+        $products = Product::where('shop_id', $shop->id)->get();
+
+        // Fetch user details
+        $user = User::find($userId);
+
+        // Count the products
+        $productCount = $products->count();
+
+        // Initialize arrays for activity data
+        $dailySalesActivity = [];
+        $dailyPurchasesActivity = [];
+        $weeklySalesActivity = [];
+        $weeklyPurchasesActivity = [];
+        $monthlySalesActivity = [];
+        $monthlyPurchasesActivity = [];
+
+        // Get activity for the last 30 days
+        for ($i = 0; $i < 30; $i++) {
+            $date = now()->subDays($i)->toDateString();
+
+            // Count completed sales for the day
+            // $salesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'completed')
+            //     ->whereDate('created_at', $date)
+            //     ->count();
+
+            // Count pending purchases for the day
+            // $purchasesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'pending')
+            //     ->whereDate('created_at', $date)
+            //     ->count();
+
+            // Store daily activity counts
+            $dailySalesActivity[] = [
+                'date' => $date,
+                'count' => $salesCount ?? 0,
+            ];
+
+            $dailyPurchasesActivity[] = [
+                'date' => $date,
+                'count' => $purchasesCount ?? 0,
+            ];
+        }
+
+        // Get weekly activity for the last 4 weeks
+        for ($i = 0; $i < 4; $i++) {
+            $startOfWeek = now()->subWeeks($i)->startOfWeek()->toDateString();
+            $endOfWeek = now()->subWeeks($i)->endOfWeek()->toDateString();
+
+            // Count sales for the week
+            // $weeklySalesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'completed')
+            //     ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+            //     ->count();
+
+            // Count pending purchases for the week
+            // $weeklyPurchasesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'pending')
+            //     ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
+            //     ->count();
+
+            // Store weekly activity counts
+            $weeklySalesActivity[] = [
+                'week' => "Week " . ($i + 1),
+                'count' => $weeklySalesCount ?? 0,
+            ];
+
+            $weeklyPurchasesActivity[] = [
+                'week' => "Week " . ($i + 1),
+                'count' => $weeklyPurchasesCount ?? 0,
+            ];
+        }
+
+        // Get monthly activity for the last 12 months
+        for ($i = 0; $i < 12; $i++) {
+            $month = now()->subMonths($i)->format('Y-m');
+
+            // Count sales for the month
+            // $monthlySalesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'completed')
+            //     ->whereMonth('created_at', now()->subMonths($i)->month)
+            //     ->whereYear('created_at', now()->subMonths($i)->year)
+            //     ->count();
+
+            // Count pending purchases for the month
+            // $monthlyPurchasesCount = Order::where('product_id', $products->pluck('id'))
+            //     ->where('status', 'pending')
+            //     ->whereMonth('created_at', now()->subMonths($i)->month)
+            //     ->whereYear('created_at', now()->subMonths($i)->year)
+            //     ->count();
+
+            // Store monthly activity counts
+            $monthlySalesActivity[] = [
+                'month' => $month,
+                'count' => $monthlySalesCount ?? 0,
+            ];
+
+            $monthlyPurchasesActivity[] = [
+                'month' => $month,
+                'count' => $monthlyPurchasesCount ?? 0,
+            ];
+        }
+
+        if ($products->isEmpty()) {
+            return $this->sendError('No products found for the user.', [], 404);
+        }
+        $response = [
+            'user' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'email' => $user->email,
+                'image' => $user->image,
+            ],
+            'shop' => [
+                'name' => $shop->shop_name,
+                'seller_name' => $shop->user->full_name,
+            ],
+            'counts' => [
+                'productCount' => $productCount,
+            ],
+            'activities' => [
+                'dailySales' => $dailySalesActivity,
+                'dailyPurchases' => $dailyPurchasesActivity,
+                'weeklySales' => $weeklySalesActivity,
+                'weeklyPurchases' => $weeklyPurchasesActivity,
+                'monthlySales' => $monthlySalesActivity,
+                'monthlyPurchases' => $monthlyPurchasesActivity,
+            ],
+        ];
+
+        return $this->sendResponse($response, 'User products retrieved successfully.');
+    }
+
+
+
 
 
 }

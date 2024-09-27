@@ -18,10 +18,17 @@ class NewsFeed extends Model
     ];
     public function comments()
     {
-        return $this->hasMany(Comment::class);
+        return $this->hasMany(Comment::class,'newsfeed_id');
     }
     public function user()
     {
         return $this->belongsTo(user::class);
     }
+    // NewsFeed.php
+    public function likes()
+    {
+        return $this->hasMany(Like::class, 'newsfeed_id');
+    }
+
+
 }
