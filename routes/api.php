@@ -54,6 +54,7 @@ Route::group(['middleware' => ['api', 'jwt.auth']], function () {
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
+    Route::get('getNewsfeedlikes', [LikeController::class, 'getNewsfeedLikes']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('comment', [CommentController::class, 'store']);
@@ -96,11 +97,15 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
 Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::apiResource('products', ProductController::class);
     Route::get('userproducts', [ProductController::class, 'userproducts']);
+    Route::get('productList', [ProductController::class, 'productList']);
     Route::post('approved/{id}', [ProductController::class, 'approved']);
     Route::post('canceled/{id}', [ProductController::class, 'canceled']);
     Route::post('pending/{id}', [ProductController::class, 'pending']);
 });
 Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('userList', [AuthController::class, 'userList']);
+    Route::get('searchUser', [AuthController::class, 'searchUser']);
+    Route::get('userProducts', [AuthController::class, 'userProducts']);
     Route::post('users/{id}/role', [AuthController::class, 'updateRole']);
     Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
 });

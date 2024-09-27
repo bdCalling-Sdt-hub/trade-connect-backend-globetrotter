@@ -15,17 +15,35 @@ use Illuminate\Support\Facades\File;
 
 class NewsFeedController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         $followingIds = $user->following()->pluck('users.id')->toArray();
-        $newsFeeds = NewsFeed::where('privacy', 'public')
-            ->orWhere('user_id', Auth::id())
-            ->orWhereIn('user_id', $followingIds)
-            ->get();
 
-        return $this->sendResponse($newsFeeds, 'Successfully retrieved news feed.');
+        $newsFeeds = NewsFeed::with(['user', 'likes', 'comments.replies', 'comments.user'])
+            ->where(function ($query) use ($user, $followingIds) {
+                $query->where('privacy', 'public')
+                    ->orWhere('user_id', $user->id)
+                    ->orWhereIn('user_id', $followingIds);
+            })
+            ->orderBy('id','DESC')
+            ->paginate(10);
+
+        $newsFeeds->getCollection()->transform(function ($newsFeed) use ($user) {
+            $newsFeed->like_count = $newsFeed->likes->count();
+            $newsFeed->auth_user_liked = $newsFeed->likes->contains('user_id', $user->id);
+
+            $newsFeed->comments->transform(function ($comment) {
+                $comment->reply_count = $comment->replies->count();
+                return $comment;
+            });
+
+            return $newsFeed;
+        });
+
+        return $this->sendResponse($newsFeeds, 'Successfully retrieved news feed with likes, comments, and replies.');
     }
+
 
     public function store(Request $request)
     {

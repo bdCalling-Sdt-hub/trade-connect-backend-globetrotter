@@ -104,12 +104,12 @@ io.on('connection', (socket) => {
         console.log("New Reply Added:", newReply);
         io.emit('commentUpdate', { newsfeedId, comments: comments[newsfeedId] });
     });
-//message
+    //message
     socket.on('message', (message) => {
       console.log(`Message : ${message}`);
       io.emit("message",message)
   });
-  //join Room
+    //join Room
     socket.on('joinRoom', (room) => {
         socket.join(room);
         console.log(`User ${socket.id} joined room: ${room.room}`);
@@ -125,6 +125,37 @@ io.on('connection', (socket) => {
     socket.on('roomMessage', ({ room, message }) => {
         console.log(`Message to room  ${room}: ${message}`);
         io.to(room).emit('roomMessage', { user: socket.id, message });
+    });
+    // 1. Sending an offer from one peer to another
+    socket.on('offer', (data) => {
+        const { room, offer } = data;
+        console.log(`Offer sent to room ${room}:${offer.type} ${offer.sdp}`);
+        socket.to(room).emit('offer', offer);
+    });
+
+    // 2. Sending an answer in response to an offer
+    socket.on('answer', (data) => {
+        const { room, answer } = data;
+        console.log(`Answer sent to room ${room}: ${answer.type} ${answer.sdp}`);
+        socket.to(room).emit('answer', answer);
+    });
+
+    // 3. Sending ICE candidates
+    socket.on('ice-candidate', (data) => {
+        const { room, candidate } = data;
+        console.log(`ICE candidate sent to room ${room}: ${candidate.candidate}`);
+        socket.to(room).emit('ice-candidate', candidate);
+    });
+
+    // WebRTC Audio/Video Calls and Room-Based Audio/Video Calls
+    socket.on('roomAudioCall', (room) => {
+        console.log(`Audio call initiated in room: ${room.room}`);
+        io.to(room).emit('roomAudioCall', `Audio call initiated in room: ${room}`);
+    });
+
+    socket.on('roomVideoCall', (room) => {
+        console.log(`Video call initiated in room: ${room.room}`);
+        io.to(room).emit('roomVideoCall', `Video call initiated in room: ${room}`);
     });
     socket.on('disconnect', () => {
         console.log('User disconnected: ' + socket.id);
