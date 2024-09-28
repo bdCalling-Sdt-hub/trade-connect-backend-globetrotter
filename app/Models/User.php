@@ -33,6 +33,7 @@ class User extends Authenticatable implements JWTSubject
         'facebook_id',
         'is_active',
         'status',
+        'user_name'
     ];
     protected $casts = [
         'otp_expires_at' => 'datetime',

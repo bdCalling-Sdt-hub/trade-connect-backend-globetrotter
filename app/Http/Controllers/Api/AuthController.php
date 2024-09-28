@@ -8,6 +8,7 @@ use App\Mail\SendOtp;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Rules\Lowercase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -33,7 +34,7 @@ class AuthController extends Controller
         }
         $validator = Validator::make($request->all(), [
             'full_name'  => 'required|string|max:255',
-            'user_name'  => 'required|string|max:255|unique:users,user_name',
+            'user_name'  => ['required', 'string', 'max:255', 'unique:users,user_name', new Lowercase()],
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|max:60',
             'c_password' => 'required|same:password',
@@ -42,6 +43,7 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json(['error' => 'Validation Error.', 'messages' => $validator->errors()], 422);
         }
+
         $user = $this->createUser($request);
         $this->sendOtpEmail($user);
 
@@ -49,18 +51,20 @@ class AuthController extends Controller
     }
     private function createUser($request)
     {
-        $otp = rand(100000, 999999);
-        $input = $request->except('c_password');
-        $input['password'] = Hash::make($input['password']);
-        $input['otp'] = $otp;
-        $input['otp_expires_at'] = now()->addMinutes(10);
-        $input['verify_email'] = 0;
-        if (empty($input['user_name'])) {
-            $input['user_name'] = strtolower(str_replace(' ', '_', $input['full_name']));
-        } else {
+        try {
+            $otp = rand(100000, 999999);
+            $input = $request->except('c_password');
+            $input['password'] = Hash::make($input['password']);
+            $input['otp'] = $otp;
+            $input['otp_expires_at'] = now()->addMinutes(10);
+            $input['verify_email'] = 0;
             $input['user_name'] = strtolower(str_replace(' ', '_', $input['user_name']));
+
+            return User::create($input);
+
+            } catch (\Exception $e) {
+                return $this->sendError('User Create Errors', ['error' => $e->getMessage()], 500);
         }
-        return User::create($input);
     }
     private function sendOtpEmail($user)
     {
