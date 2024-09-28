@@ -39,6 +39,7 @@ class SendOtp extends Mailable
     {
         return new Content(
             view: 'emails.send_otp',
+            with:['otp'=>$this->otp]
         );
     }
 
