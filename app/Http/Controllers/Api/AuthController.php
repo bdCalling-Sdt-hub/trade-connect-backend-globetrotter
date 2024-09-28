@@ -26,7 +26,6 @@ class AuthController extends Controller
 
         if ($user) {
             $this->sendOtpEmail($user);
-
             return response()->json([
                 'status' => 200,
                 'message' => 'Please check your email to validate your account.'
@@ -34,6 +33,7 @@ class AuthController extends Controller
         }
         $validator = Validator::make($request->all(), [
             'full_name'  => 'required|string|max:255',
+            'user_name'  => 'required|string|max:255|unique:users,user_name',
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|max:60',
             'c_password' => 'required|same:password',
@@ -55,7 +55,11 @@ class AuthController extends Controller
         $input['otp'] = $otp;
         $input['otp_expires_at'] = now()->addMinutes(10);
         $input['verify_email'] = 0;
-
+        if (empty($input['user_name'])) {
+            $input['user_name'] = strtolower(str_replace(' ', '_', $input['full_name']));
+        } else {
+            $input['user_name'] = strtolower(str_replace(' ', '_', $input['user_name']));
+        }
         return User::create($input);
     }
     private function sendOtpEmail($user)
@@ -67,11 +71,15 @@ class AuthController extends Controller
             'verify_email' => 0
         ]);
         $emailData = [
-            'name' => $user->first_name . ' ' . $user->last_name,
+            'name' => $user->full_name,
             'otp' => $otp,
         ];
+        try {
+            Mail::to($user->email)->queue(new OtpVerificationMail($emailData));
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to send OTP email. Please try again.', ['error' => $e->getMessage()], 500);
+        }
 
-        Mail::to($user->email)->queue(new OtpVerificationMail($emailData));
     }
     public function verifyOtp(Request $request)
     {
@@ -157,7 +165,7 @@ class AuthController extends Controller
         }
          else {
             $random = rand(100000, 999999);
-            Mail::to($request->email)->send(new SendOtp($random));
+            Mail::to($request->email)->queue(new SendOtp($random));
             $user->update(['otp' => $random]);
             $user->update(['verify_email' => 0]);
             return response()->json(['status'=>200, 'message' => 'Please check your email for get the OTP']);
@@ -238,7 +246,7 @@ class AuthController extends Controller
         $user->otp_expires_at = now()->addMinutes(10);
         $user->save();
 
-        Mail::to($user->email)->send(new SendOtp($user));
+        Mail::to($user->email)->queue(new SendOtp($user));
 
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }

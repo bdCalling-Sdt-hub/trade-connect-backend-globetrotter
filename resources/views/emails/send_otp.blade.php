@@ -71,9 +71,12 @@
 
         <!-- Body -->
         <div class="email-body">
-            <p>Hello{{ isset($name) ? ', ' . $name : '' }},</p>
+            <p>Hello , </p><br>
+            <p>
+                {{ isset($otp['name']) ?  $otp['name'] .',' : '' }}
+            </p>
             <p>Please use the following OTP code to proceed:</p>
-            <div class="otp-code">{{ $otp }}</div>
+            <div class="otp-code">{{ $otp['otp'] }}</div>
             <p>This code is valid for 10 minutes. Please do not share it with anyone.</p>
             <p>If you did not request this OTP, please ignore this email.</p>
         </div>

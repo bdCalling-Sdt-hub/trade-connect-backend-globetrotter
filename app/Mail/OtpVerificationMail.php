@@ -39,6 +39,7 @@ class OtpVerificationMail extends Mailable
     {
         return new Content(
             view: 'emails.otpVerify',
+            with: ['data' => $this->data],
         );
     }
 

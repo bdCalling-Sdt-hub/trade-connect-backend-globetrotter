@@ -50,7 +50,7 @@ class SearchController extends Controller
     }
     private function people(string $query)
     {
-        return User::where('full_name', 'like', '%' . $query . '%')->get();
+        return User::where('user_name', 'like', '%' . $query . '%')->get();
     }
     public function newsfeed(Request $request)
     {
@@ -89,7 +89,7 @@ class SearchController extends Controller
         ]);
         $query = $request->input('query');
 
-        $users = User::where('full_name', 'like', '%' . $query . '%')->get();
+        $users = User::where('user_name', 'like', '%' . $query . '%')->get();
         if(!$users){
             return $this->sendError([],"No users Found.");
         }
