@@ -2,6 +2,7 @@
 <?php
 
 use App\Http\Controllers\Api\FaqController;
+use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\LikeController;
 use App\Http\Controllers\Api\LoveController;
 use App\Http\Controllers\Api\NotificationController;
@@ -40,6 +41,7 @@ Route::group([
     Route::post('/logout', 'logout')->middleware('jwt.auth');
     Route::get('/user', 'user')->middleware('jwt.auth');
     Route::post('/updatePassword', 'updatePassword')->middleware('jwt.auth');
+    Route::get('/userProfile', 'UserProfile')->middleware('jwt.auth');
     Route::put('/profile', 'profile')->middleware('jwt.auth');
     Route::patch('/isActive', 'isActive')->middleware('jwt.auth');
     Route::patch('/noActive', 'noActive')->middleware('jwt.auth');
@@ -51,6 +53,12 @@ Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::delete('/newsfeeds/{id}', [NewsFeedController::class, 'destroy']);
     Route::get('/newsfeedsCount', [NewsFeedController::class, 'count']);
     Route::get('/usernewsfeeds', [NewsFeedController::class, 'usernewsfeeds']);
+});
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('/friend/request', [FriendController::class, 'sendFriendRequest']);
+    Route::post('/friend/accept/{friend_id}', [FriendController::class, 'acceptFriendRequest']);
+    Route::delete('/friend-request/cancel/{friend_id}', [FriendController::class, 'cancelFriendRequest']);
+    Route::delete('/unfriend/{friend_id}', [FriendController::class, 'unfriend']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);

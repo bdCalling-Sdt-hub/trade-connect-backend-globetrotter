@@ -37,7 +37,7 @@ class AuthController extends Controller
             'user_name'  => ['required', 'string', 'max:255', 'unique:users,user_name', new Lowercase()],
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|max:60',
-            'c_password' => 'required|same:password',
+            'address'    => 'required|string|max:255',
             'role'       => ['required', Rule::in(['MEMBER', 'ADMIN'])],
         ]);
         if ($validator->fails()) {
@@ -168,23 +168,19 @@ class AuthController extends Controller
             ], 400);
         }
          else {
-            $random = rand(100000, 999999);
-            Mail::to($request->email)->queue(new SendOtp($random));
-            $user->update(['otp' => $random]);
-            $user->update(['verify_email' => 0]);
+            $this->sendOtpEmail($user);
             return response()->json(['status'=>200, 'message' => 'Please check your email for get the OTP']);
         }
     }
     public function resetPassword(Request $request)
     {
         $user = User::where('email', $request->email)->first();
-
         if (!$user) {
             return response()->json([
                 "message" => "Your email is not exists"
             ], 401);
         }
-        if (!$user->verify_email == 0) {
+        if (!$user->verify_email == 1) {
             return response()->json([
                 "message" => "Your email is not verified"
             ], 401);
@@ -225,15 +221,28 @@ class AuthController extends Controller
 
         return response()->json(['status' => 200, 'message' => 'Password updated successfully'], 200);
     }
-    public function user(){
+    public function user()
+    {
         $user = Auth::user();
         if (!$user) {
-            return response()->json(['status'=> 400,'message'=> 'You are not Authenticated'] , 400);
-        }else{
-            $users = User::all();
-            return response()->json(['status'=> 200,'users'=> $users], 200);
+            return response()->json(['status' => 400, 'message' => 'You are not authenticated'], 400);
         }
+        $users = User::all();
+        $formattedUsers = $users->map(function($user) {
+            return [
+                'id'=>$user->id,
+                'full_name' => $user->full_name,
+                'user_name' => $user->user_name,
+                'email' => $user->email,
+                'location' => $user->location,
+                'address' => $user->address,
+                'image' => $user->image ? url('Profile/' . $user->image) : null,
+            ];
+        });
+
+        return response()->json(['status' => 200, 'users' => $formattedUsers], 200);
     }
+
     public function resendOtp(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -244,17 +253,32 @@ class AuthController extends Controller
             return response()->json(['status' => 422, 'errors' => $validator->errors()], 422);
         }
         $user = User::where('email', $request->email)->first();
-
-        $otp = rand(100000, 999999);
-        $user->otp = $otp;
-        $user->otp_expires_at = now()->addMinutes(10);
-        $user->save();
-
-        Mail::to($user->email)->queue(new SendOtp($user));
+        Mail::to($user->email)->queue(new OtpVerificationMail($user));
 
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }
+    public function UserProfile(Request $request)
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
 
+        $imageUrl = $user->image ? url('Profile/' . $user->image) : null;
+        $profileData = [
+            'full_name' => $user->full_name,
+            'user_name' => $user->user_name,
+            'location' => $user->location,
+            'image' => $imageUrl,
+        ];
+
+        return response()->json([
+            'status' => true,
+            'message' => 'User profile fetched successfully.',
+            'data' => $profileData,
+        ], 200);
+    }
+    //profile update
     public function profile(Request $request)
     {
         $user = Auth::user();
@@ -264,6 +288,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'full_name' => 'nullable|required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'location' => 'nullable|required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -283,7 +308,8 @@ class AuthController extends Controller
             $image->move(public_path('profile'), $fileName);
         }
         $user->full_name = $request->full_name ?? $user->full_name;
-        $user->image = $fileName;
+        $user->image = $fileName ?? $user->image;
+        $user->location = $request->location ?? $user->location;
         $user->save();
 
         return $this->sendResponse($user, 'Profile updated successfully.');

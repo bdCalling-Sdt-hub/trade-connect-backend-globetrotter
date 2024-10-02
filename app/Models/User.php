@@ -33,7 +33,9 @@ class User extends Authenticatable implements JWTSubject
         'facebook_id',
         'is_active',
         'status',
-        'user_name'
+        'user_name',
+        'address',
+        'location',
     ];
     protected $casts = [
         'otp_expires_at' => 'datetime',
@@ -100,6 +102,9 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Product::class);
     }
-
+    public function friendRequestsSent()
+    {
+        return $this->hasMany(Friend::class, 'user_id');
+    }
 
 }
