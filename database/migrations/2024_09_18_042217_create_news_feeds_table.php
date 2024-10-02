@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->longText('share_your_thoughts');
             $table->json('images')->nullable();
-            $table->enum('privacy', ['public','private'])->default('public');
+            $table->enum('privacy', ['public','private','friends'])->default('public');
             $table->boolean('status')->default(true);
             $table->timestamps();
         });
