@@ -36,6 +36,7 @@ class User extends Authenticatable implements JWTSubject
         'user_name',
         'address',
         'location',
+        'privacy',
     ];
     protected $casts = [
         'otp_expires_at' => 'datetime',
@@ -102,9 +103,26 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Product::class);
     }
-    public function friendRequestsSent()
+    public function newsFeeds()
     {
-        return $this->hasMany(Friend::class, 'user_id');
+        return $this->hasMany(NewsFeed::class, 'user_id');
+    }
+    public function friends()
+    {
+        return $this->belongsToMany(User::class, 'friends', 'user_id', 'friend_id')
+                    ->wherePivot('is_accepted', true);
+    }
+    public function friendRequests()
+    {
+        return $this->hasMany(Friend::class, 'friend_id')->where('is_accepted', false);
+    }
+    public function likes()
+    {
+        return $this->hasMany(Like::class);
+    }
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
     }
 
 }

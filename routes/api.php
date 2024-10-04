@@ -10,7 +10,6 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\ShopController;
 use Illuminate\Support\Facades\Route;
-
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CommentController;
@@ -21,6 +20,7 @@ use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NewsFeedController;
 use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SocketController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\TermAndConditioncontroller;
 
 Route::group([
@@ -47,6 +47,13 @@ Route::group([
     Route::patch('/noActive', 'noActive')->middleware('jwt.auth');
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
+    Route::post('/privacy-private', [ProfileController::class, 'privacyPrivate']);
+    Route::post('/privacy-friend', [ProfileController::class, 'privacyFriend']);
+    Route::post('/privacy-public', [ProfileController::class, 'privacyPublic']);
+    Route::get('/userProfile', [ProfileController::class, 'userProfile']);
+    Route::get('/anotherUserProfile/{id}', [ProfileController::class, 'anotherUserProfile']);
+});
+Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::get('/newsfeeds', [NewsFeedController::class, 'index']);
     Route::post('/newsfeeds', [NewsFeedController::class, 'store']);
     Route::put('/updateNewsfeeds/{id}', [NewsFeedController::class, 'update']);
@@ -55,10 +62,12 @@ Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::get('/usernewsfeeds', [NewsFeedController::class, 'usernewsfeeds']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
-    Route::post('/friend/request', [FriendController::class, 'sendFriendRequest']);
-    Route::post('/friend/accept/{friend_id}', [FriendController::class, 'acceptFriendRequest']);
-    Route::delete('/friend-request/cancel/{friend_id}', [FriendController::class, 'cancelFriendRequest']);
+    Route::post('/friend-request/{friend_id}', [FriendController::class, 'sendRequest']);
+    Route::post('/accept-request/{friend_id}', [FriendController::class, 'acceptRequest']);
     Route::delete('/unfriend/{friend_id}', [FriendController::class, 'unfriend']);
+    Route::delete('/cancel-request/{friend_id}', [FriendController::class, 'cancelRequest']);
+    Route::get('/user-friend-requests', [FriendController::class, 'userFriendRequests']);
+    Route::get('/user-friends', [FriendController::class, 'userFriends']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
