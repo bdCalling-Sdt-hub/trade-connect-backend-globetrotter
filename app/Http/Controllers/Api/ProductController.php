@@ -25,6 +25,9 @@ class ProductController extends Controller
             $products = $products->map(function ($product) {
                 return [
                     'id' => $product->id,
+                    'full_name'     => $product->user->full_name,
+                    'user_name'     => $product->user->user_name,
+                    'image'         => url('Profile/',$product->user->image),
                     'product_name' => $product->product_name,
                     'category_name' => $product->category->category_name,
                     'product_price' => $product->price,
@@ -50,6 +53,7 @@ class ProductController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'shop_id' => 'required|exists:shops,id',
+            'user_id' => 'required|exists:users,id',
             'category_id' => 'required|exists:categories,id',
             'product_name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
@@ -75,6 +79,7 @@ class ProductController extends Controller
         $uniqueProductCode = $this->generateUniqueProductCode($userId);
         $product = Product::create([
             'shop_id' => $request->shop_id,
+            'user_id' => $request->user_id,
             'category_id' => $request->category_id,
             'product_name' => $request->product_name,
             'price' => $request->price,
@@ -250,6 +255,9 @@ class ProductController extends Controller
                 return [
                     'id' => $product->id,
                     'product_name' => $product->product_name,
+                    'full_name'     => $product->user->full_name,
+                    'user_name'     => $product->user->user_name,
+                    'image'         => url('Profile/',$product->user->image),
                     'product_category' => $product->category->category_name,
                     'price' => $product->price,
                     'product_status' => $product->status,
@@ -292,13 +300,15 @@ class ProductController extends Controller
         $formattedProducts = $products->map(function ($product) {
             return [
                 'id' => $product->id,
+                'full_name' => $product->user->full_name,
+                'user_name' => $product->user->user_name,
+                'image' => url('Profile/',$product->user->image),
                 'product_name' => $product->product_name,
                 'category_name' => $product->category->category_name,
                 'product_code' => $product->product_code,
                 'price' => $product->price,
                 'description' => $product->description,
-                'images' => json_decode($product->images),
-
+                'product_images' => json_decode($product->images),
                 'shop' => [
                     'shop_name' => $product->shop->shop_name,
                     'seller' => [

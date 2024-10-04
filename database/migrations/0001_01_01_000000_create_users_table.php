@@ -28,6 +28,7 @@ return new class extends Migration
             $table->string('role');
             $table->string('google_id')->nullable();
             $table->string('facebook_id')->nullable();
+            $table->string('privacy')->default('public'); 
             $table->boolean('is_active')->nullable();
             $table->string('status')->nullable();
             $table->rememberToken();
