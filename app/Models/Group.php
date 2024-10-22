@@ -15,12 +15,20 @@ class Group extends Model
         'created_by',
         'status',
     ];
-    public function members()
-    {
-        return $this->belongsToMany(User::class, 'group_members');
-    }
+    // public function members()
+    // {
+    //     return $this->belongsToMany(User::class, 'group_members');
+    // }
     public function messages()
     {
         return $this->hasMany(GroupMessage::class);
+    }
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'group_members', 'group_id', 'user_id');
+    }
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

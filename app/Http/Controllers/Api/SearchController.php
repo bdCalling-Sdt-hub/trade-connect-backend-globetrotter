@@ -65,6 +65,7 @@ class SearchController extends Controller
         if(!$newsfeeds){
             return $this->sendError([],"No NewsFeed Found.");
         }
+
         return $this->sendResponse($newsfeeds, 'Successfully retrieved newsfeeds.');
     }
     public function products(Request $request)

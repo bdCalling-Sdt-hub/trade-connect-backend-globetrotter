@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('term_and_conditions', function (Blueprint $table) {
             $table->id();
-            $table->longText('content');
+            $table->longText('content')->default('Welcome to my Company! These Terms and Conditions outline the rules and regulations for the use of our website and services.');
             $table->boolean('status')->default(true);
             $table->timestamps();
         });
