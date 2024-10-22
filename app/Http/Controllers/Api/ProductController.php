@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
@@ -16,6 +17,22 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 class ProductController extends Controller
 {
+    public function categories()
+    {
+        try {
+            $categories = Category::orderBy('id', 'DESC')->paginate(10);
+            $formattedCategories = $categories->getCollection()->map(function ($category) {
+                return [
+                    'id' => $category->id,
+                    'category_name' => $category->category_name,
+                ];
+            });
+            $paginatedData = $categories->setCollection($formattedCategories);
+            return $this->sendResponse($paginatedData, 'Categories retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->sendError('Error retrieving categories', ['error' => $e->getMessage()], 500);
+        }
+    }
     public function index()
     {
         try {
@@ -53,7 +70,6 @@ class ProductController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'shop_id' => 'required|exists:shops,id',
-            'user_id' => 'required|exists:users,id',
             'category_id' => 'required|exists:categories,id',
             'product_name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
@@ -79,7 +95,7 @@ class ProductController extends Controller
         $uniqueProductCode = $this->generateUniqueProductCode($userId);
         $product = Product::create([
             'shop_id' => $request->shop_id,
-            'user_id' => $request->user_id,
+            'user_id' => $request->user()->id,
             'category_id' => $request->category_id,
             'product_name' => $request->product_name,
             'price' => $request->price,
@@ -250,7 +266,6 @@ class ProductController extends Controller
             $products = Product::with(['shop.user', 'category'])
                 ->orderBy('id', 'DESC')
                 ->paginate(10);
-
             $formattedProducts = $products->getCollection()->map(function ($product) {
                 return [
                     'id' => $product->id,
@@ -271,15 +286,12 @@ class ProductController extends Controller
                     ],
                 ];
             });
-
             $paginatedData = $products->setCollection($formattedProducts);
-
             return $this->sendResponse($paginatedData, 'Product list retrieved successfully.');
         } catch (\Exception $e) {
             return $this->sendError('Error retrieving product list', ['error' => $e->getMessage()], 500);
         }
     }
-
     public function userproducts()
     {
         $userId = Auth::id();
@@ -288,16 +300,17 @@ class ProductController extends Controller
         if (!$shop) {
             return $this->sendError([], "No shop found for the authenticated user.");
         }
-
         $products = Product::where('shop_id', $shop->id)
             ->where('status', 'approved')
             ->with(['category', 'shop.user'])
+            ->orderBy('id','desc')
             ->get();
 
         if ($products->isEmpty()) {
             return $this->sendError([], "No approved products found for the shop.");
         }
         $formattedProducts = $products->map(function ($product) {
+
             return [
                 'id' => $product->id,
                 'full_name' => $product->user->full_name,
@@ -308,7 +321,10 @@ class ProductController extends Controller
                 'product_code' => $product->product_code,
                 'price' => $product->price,
                 'description' => $product->description,
-                'product_images' => json_decode($product->images),
+                'created_at' => $product->created_at->format('Y-m-d H:i:s'),
+                'product_images' =>  collect(json_decode($product->images))->map(function ($image) {
+                                        return $image ? url("products/",$image) : '';
+                                    }),
                 'shop' => [
                     'shop_name' => $product->shop->shop_name,
                     'seller' => [
@@ -317,9 +333,6 @@ class ProductController extends Controller
                 ],
             ];
         });
-
         return $this->sendResponse($formattedProducts, 'Approved products retrieved successfully.');
     }
-
-
 }

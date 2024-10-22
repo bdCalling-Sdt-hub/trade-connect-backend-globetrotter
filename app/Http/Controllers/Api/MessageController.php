@@ -10,6 +10,49 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class MessageController extends Controller
 {
+    public function getMessage()
+    {
+        $userId = auth()->id();
+        $messages = Message::where(function ($query) use ($userId) {
+                    $query->where('sender_id', $userId)
+                        ->orWhere('receiver_id', $userId);
+                })
+                ->with(['sender', 'receiver'])
+                ->orderBy('created_at', 'desc')
+                ->get();
+        if ($messages->isEmpty()) {
+            return $this->sendError('No messages found.');
+        }
+        $formattedMessages = $messages->map(function ($message) {
+            return [
+                'id' => $message->id,
+                'message' => $message->message,
+                'images' => $message->images,
+                'is_read' => $message->is_read,
+                'created_at' => $message->created_at,
+                'sender' => [
+                    'id' => $message->sender->id,
+                    'full_name' => $message->sender->full_name,
+                    'user_name' => $message->sender->user_name,
+                    'email' => $message->sender->email,
+                    'image'=> url('profile/',$message->sender->image),
+
+                ],
+                'receiver' => [
+                    'id' => $message->receiver->id,
+                    'full_name' => $message->receiver->full_name,
+                    'user_name' => $message->receiver->user_name,
+                    'email' => $message->receiver->email,
+                    'image'=> url('profile/',$message->receiver->image),
+                ],
+            ];
+        });
+
+        return $this->sendResponse($formattedMessages, 'Messages retrieved successfully.');
+    }
+
+
+
     public function store(Request $request)
     {
         // return $request;
@@ -32,7 +75,6 @@ class MessageController extends Controller
                     $imagePaths[] =$filename;
                 }
             }
-            // return $request->message;
             $message = Message::create([
                 'sender_id' => $request->sender_id,
                 'receiver_id' => $request->receiver_id,
@@ -63,8 +105,6 @@ class MessageController extends Controller
         }
 
     }
-
-
 public function destroy($id)
     {
         try {

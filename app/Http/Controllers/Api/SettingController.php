@@ -7,9 +7,30 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class SettingController extends Controller
 {
+    public function getPersonalInformation()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        if (!$user) {
+            return response()->json(['error' => 'User not found'], 404);
+        }
+        $imageUrl = $user->image ? url('Profile/' . $user->image) : null;
+        $profileData = [
+            'full_name' => $user->full_name,
+            'bio'=> $user->bio ?? '',
+            'location' => $user->location,
+            'image' => $imageUrl,
+        ];
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Personal Information fetched successfully.',
+            'data' => $profileData,
+        ], 200);
+    }
     public function personalInformation(Request $request)
     {
         $userId = auth()->user()->id;

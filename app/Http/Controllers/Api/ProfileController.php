@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Friend;
+use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,8 +20,6 @@ class ProfileController extends Controller
 
         return $this->sendResponse(["privacy"=>$user->privacy], 'Privacy set to private.');
     }
-
-    // Set privacy to friends
     public function privacyFriend(Request $request)
     {
         $user = Auth::user();
@@ -29,8 +28,6 @@ class ProfileController extends Controller
 
         return $this->sendResponse(["privacy"=>$user->privacy], 'Privacy set to friends.');
     }
-
-    // Set privacy to public
     public function privacyPublic(Request $request)
     {
         $user = Auth::user();
@@ -51,7 +48,6 @@ class ProfileController extends Controller
         $user = Auth::user();
         $anotherUser = User::findOrFail($id);
 
-        // Check privacy settings
         if ($anotherUser->privacy === 'private' && $anotherUser->id !== $user->id) {
             return $this->sendError('No available data found', 403);
         }
@@ -83,12 +79,9 @@ class ProfileController extends Controller
                     ->orWhere('friend_id', $user->id);
             })
             ->count();
-
-        // Apply privacy filter to news feeds if necessary
         $newsFeedsQuery = $user->newsFeeds()->orderBy('id', 'DESC');
         if ($privacyFilter) {
             if ($privacyFilter === 'friends') {
-                // Get accepted friends' IDs
                 $friendIds = Friend::where('is_accepted', true)
                     ->where(function ($query) use ($user) {
                         $query->where('user_id', $user->id)
@@ -113,11 +106,18 @@ class ProfileController extends Controller
                 'image_count'     => count($decodedImages),
                 'images'          => collect(json_decode($newsFeed->images))->map(function ($image) {
                                         return [
-                                        'url' => url('NewsFeedImages/', $image),
+                                        'url' => $image ? url('NewsFeedImages/', $image) : '',
                                         ];
                                     })->toArray(),
 
                 'newsfeed_status' => $newsFeed->status ? 'active' : 'inactive',
+                'user'=>[
+                    'id'=> $newsFeed->user->id ?? '',
+                    'full_name'=> $newsFeed->user->full_name ?? '',
+                    'user_name'=> $newsFeed->user->user_name ?? '',
+                    'email'=> $newsFeed->user->email ?? '',
+                    'image'=> $newsFeed->user->image ? url('Profile/',$newsFeed->user->image) : '',
+                    ],
                 'like_count'    => $newsFeed->likes->count(),
                 'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
                 'comment_count' => $newsFeed->comments->count(),
@@ -126,7 +126,7 @@ class ProfileController extends Controller
                         'id'            => $comment->id,
                         'full_name'     => $comment->user->full_name,
                         'user_name'     => $comment->user->user_name,
-                        'image'         => $comment->user->image,
+                        'image'         => $comment->user->image ? url('Profile/',$comment->user->image) :'',
                         'comment'       => $comment->comments,
                         'created_at'    => $this->getTimePassed($comment->created_at),
                         'reply_count'   => $comment->replies->count(),
@@ -136,7 +136,7 @@ class ProfileController extends Controller
                                 'comment'    => $reply->comments,
                                 'full_name'  => $reply->user->full_name,
                                 'user_name'  => $reply->user->user_name,
-                                'image'      => url('Profile/',$reply->user->image),
+                                'image'      => $reply->user->image ? url('Profile/',$reply->user->image) : '',
                                 'created_at' => $this->getTimePassed($reply->created_at),
                             ];
                         })
@@ -144,6 +144,13 @@ class ProfileController extends Controller
                 })
             ];
         });
+        $shop = null;
+        $shopData = Shop::where('user_id', $user->id)->first();
+        if ($shopData) {
+            $shop = [
+                'shop_name' => $shopData->shop_name,
+            ];
+        }
         $formattedProducts = $user->products->map(function ($product) {
             return [
                 'id'          => $product->id,
@@ -151,46 +158,54 @@ class ProfileController extends Controller
                 'product_code'=> $product->product_code,
                 'category_name'=> $product->category->category_name,
                 'price'       => $product->price,
-                'images'      => collect(json_decode($product->images))->map(function ($image) {
-                                    return [
-                                        'url' => url('ProductImages/' . $image),
-                                    ];
-                                })->toArray(),
+                'product_images'      => collect(json_decode($product->images))->map(function ($image) {
+                                    return $image ? url('products/', $image) : '';
+
+                                }),
                 'description' => $product->description,
                 'shop_name'   => $product->shop->shop_name,
+                'seller_name' => $product->shop->user->full_name,
+                'seller_user_name' => $product->shop->user->user_name,
+                'seller_image' => $product->shop->user->image ? url('Profile/', $product->shop->user->image) : '',
                 'created_at'  => $product->created_at->format('Y-m-d H:i:s'),
             ];
         });
-
         return $this->sendResponse([
             'id'            => $user->id,
             'full_name'     => $user->full_name,
             'user_name'     => $user->user_name,
+            'bio'           => $user->bio,
             'privacy'       => $user->privacy,
             'email'         => $user->email,
-            'image'         => url('Profile/',$user->image),
+            'image'         => $user->image ? url('Profile/',$user->image) : '',
             'friends_count' => $friendsCount,
-            'news_feeds'    => $formattedNewsFeeds,
-            'formattedProducts'=> $formattedProducts,
+            'news_feeds'    => $formattedNewsFeeds ?? '',
+            'shop'          => $shop ?? '',
+            'formattedProducts'=> $formattedProducts ?? '',
             'created_at'    => $user->created_at->format('Y-m-d H:i:s'),
             'updated_at'    => $user->updated_at->format('Y-m-d H:i:s'),
         ], 'User profile retrieved successfully');
     }
-
     protected function getTimePassed($createdAt)
     {
         $now = Carbon::now();
-        $diffInMinutes = $now->diffInMinutes($createdAt);
+        $diff = $now->diff($createdAt);
 
-        if ($diffInMinutes == 0) {
-            return 'right now'; // If the comment was created less than a minute ago
-        } elseif ($diffInMinutes < 60) {
-            return $diffInMinutes . ' minutes ago';
-        } elseif ($diffInMinutes < 1440) { // 1440 minutes = 24 hours
-            $diffInHours = $now->diffInHours($createdAt);
-            return $diffInHours . ' hours ago';
+        if ($diff->y > 0) {
+            return $diff->y === 1 ? '1 year ago' : "{$diff->y} years ago";
+        } elseif ($diff->m > 0) {
+            return $diff->m === 1 ? '1 month ago' : "{$diff->m} months ago";
+        } elseif ($diff->d >= 7) {
+            $weeks = floor($diff->d / 7);
+            return $weeks === 1 ? '1 week ago' : "{$weeks} weeks ago";
+        } elseif ($diff->d > 0) {
+            return $diff->d === 1 ? '1 day ago' : "{$diff->d} days ago";
+        } elseif ($diff->h > 0) {
+            return $diff->h === 1 ? '1 hour ago' : "{$diff->h} hours ago";
+        } elseif ($diff->i > 0) {
+            return $diff->i === 1 ? '1 minute ago' : "{$diff->i} minutes ago";
         } else {
-            return 'old'; // More than 24 hours
+            return 'right now';
         }
     }
 }

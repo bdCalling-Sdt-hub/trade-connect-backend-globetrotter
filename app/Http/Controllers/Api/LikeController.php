@@ -24,7 +24,7 @@ class LikeController extends Controller
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
         $existingLike = Like::where('newsfeed_id', $request->newsfeed_id)
-                            ->where('user_id', $request->user_id)
+                            ->where('user_id', auth()->user()->id)
                             ->first();
 
         if ($existingLike) {
@@ -33,18 +33,22 @@ class LikeController extends Controller
         } else {
             $like = Like::create(attributes: [
                 'newsfeed_id' => $request->newsfeed_id,
-                'user_id' => $request->user_id,
+                'user_id' => auth()->user()->id,
             ]);
-            $user = User::find($like->user_id);
+           $newsfeed = NewsFeed::where('id', $request->newsfeed_id)
+                    //  ->where('user_id', $request->user_id)
+                     ->first();
+            if (!$newsfeed) {
+                return $this->sendError("No newsfeed found.");
+            }
+            $user = User::find($newsfeed->user_id);
             $user->notify(new LikeNotification($like));
             return $this->sendResponse($like, "Like successfully added.");
         }
-
     }
     public function getNewsfeedLikes()
     {
         $newsfeeds = NewsFeed::all();
-
         $newsfeedsLikes = [];
         foreach ($newsfeeds as $newsfeed) {
             $likes = Like::where('newsfeed_id', $newsfeed->id)->get();

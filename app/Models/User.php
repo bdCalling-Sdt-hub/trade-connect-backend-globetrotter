@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Notification;
 use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 
 
@@ -124,5 +125,12 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Comment::class);
     }
+    public function members()
+{
+    return $this->belongsToMany(User::class, 'group_members', 'group_id', 'user_id');
+}
+
+
+
 
 }

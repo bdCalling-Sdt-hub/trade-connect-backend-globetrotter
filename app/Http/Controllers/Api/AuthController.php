@@ -17,10 +17,64 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use PHPOpenSourceSaver\JWTAuth\Exceptions\JWTException;
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenExpiredException;
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenInvalidException;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
+    public function getUserName(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'query' => 'required|string|min:1',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
+        }
+        $query = $request->query('query');
+        $members = User::whereRaw('LOWER(user_name) = ?', [strtolower($query)])->get()
+        ->map(function ($member) {
+            return [
+                'user_id'   => $member->id,
+                'user_name' => $member->user_name,
+            ];
+        });
+        if ($members->isEmpty()) {
+            return $this->sendError('No members found matching your query.', [], 404);
+        }
+        return $this->sendResponse($members, 'Members retrieved successfully.');
+    }
+    public function validateToken()
+    {
+        try {
+            // Log the token for debugging
+            $token = JWTAuth::getToken();
+            \Log::info('Token being validated: ' . $token);
+
+            $user = JWTAuth::parseToken()->authenticate();
+            if (!$user) {
+                return response()->json([
+                    'token_status' => false,
+                    'error' => 'Invalid token or user not found.'
+                ], 401);
+            }
+            return response()->json([
+                'status' => 200,
+                'token_status' => true,
+                'message' => 'Token is valid.',
+            ]);
+        } catch (TokenExpiredException $e) {
+            return response()->json(['token_status' => false, 'error' => 'Token has expired.'], 401);
+        } catch (TokenInvalidException $e) {
+            return response()->json(['token_status' => false, 'error' => 'Token is invalid.'], 401);
+        } catch (JWTException $e) {
+            return response()->json(['token_status' => false, 'error' => 'Token is missing.'], 401);
+        } catch (\Exception $e) {
+            return response()->json(['token_status' => false, 'error' => 'An unexpected error occurred.'], 500);
+        }
+    }
+
+
     public function register(Request $request)
     {
         $user = User::where('email', $request->email)->where('verify_email', 0)->first();
@@ -130,6 +184,15 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required|string|min:8',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
+        }
+
         $credentials = $request->only('email', 'password');
 
         try {
@@ -139,7 +202,6 @@ class AuthController extends Controller
         } catch (JWTException $e) {
             return response()->json(['error' => 'Could not create token'], 500);
         }
-
         return response()->json([
             'status' => 200,
             'message' => 'Login successfully.',
@@ -227,7 +289,7 @@ class AuthController extends Controller
         if (!$user) {
             return response()->json(['status' => 400, 'message' => 'You are not authenticated'], 400);
         }
-        $users = User::all();
+        $users = User::orderBy('id','desc')->paginate(10);
         $formattedUsers = $users->map(function($user) {
             return [
                 'id'=>$user->id,
@@ -257,17 +319,20 @@ class AuthController extends Controller
 
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }
-    public function UserProfile(Request $request)
+    public function getProfile(Request $request)
     {
         $user = JWTAuth::parseToken()->authenticate();
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);
         }
-
         $imageUrl = $user->image ? url('Profile/' . $user->image) : null;
         $profileData = [
+            'id'=> $user->id,
             'full_name' => $user->full_name,
             'user_name' => $user->user_name,
+            'email'=> $user->email,
+            'bio'=> $user->bio ?? '',
+            'privicy'=>$user->privacy ??'',
             'location' => $user->location,
             'image' => $imageUrl,
         ];
@@ -289,6 +354,7 @@ class AuthController extends Controller
             'full_name' => 'nullable|required|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'location' => 'nullable|required|string|max:255',
+            'bio' => 'nullable|required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -310,6 +376,7 @@ class AuthController extends Controller
         $user->full_name = $request->full_name ?? $user->full_name;
         $user->image = $fileName ?? $user->image;
         $user->location = $request->location ?? $user->location;
+        $user->bio = $request->bio ?? $user->bio;
         $user->save();
 
         return $this->sendResponse($user, 'Profile updated successfully.');

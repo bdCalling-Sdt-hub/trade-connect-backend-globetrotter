@@ -4,11 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Shop;
+use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ShopController extends Controller
 {
+    public function userShop()
+    {
+        $user= Auth::user();
+        $shop= Shop::where("user_id",$user->id)->first();
+        if(!$shop){
+            $this->sendError([],"No shop found.");
+        }
+        return $this->sendResponse($shop,"user shop get successfully.");
+    }
     public function index()
     {
         try {
@@ -41,6 +51,10 @@ class ShopController extends Controller
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 400);
         }
+        if(Shop::where('user_id', $request->user()->id)->exists()) {
+            return $this->sendError([], ['error'=> 'Your shop already exits.']) ;
+        }
+
 
         $shop = new Shop();
         $shop->user_id = auth()->user()->id; // Automatically set the authenticated user

@@ -52,8 +52,8 @@ class FriendController extends Controller
     public function cancelRequest($friend_id)
     {
         $user_id = auth()->user()->id;
-        $friendRequest = Friend::where('user_id', $user_id)
-            ->where('friend_id', $friend_id)
+        $friendRequest = Friend::where('user_id', $friend_id)
+            ->where('friend_id', $user_id)
             ->where('is_accepted', false)
             ->first();
         if (!$friendRequest) {
@@ -74,10 +74,11 @@ class FriendController extends Controller
                                 ->through(function ($friendRequest) {
                                     return [
                                         'id'          => $friendRequest->id,
-                                        'full_name'   => $friendRequest->user->full_name,
+                                        'user_id'   => $friendRequest->user->id,
                                         'user_name'   => $friendRequest->user->user_name,
+                                        'full_name'   => $friendRequest->user->full_name,
                                         'is_accepted' => $friendRequest->is_accepted,
-                                        'image'       => $friendRequest->user->image
+                                        'image'       => $friendRequest->user->image ? url('Profile/',$friendRequest->user->image) : '',
                                     ];
                                 });
         $totalRequestsCount = Friend::where('friend_id', $user_id)
@@ -108,7 +109,8 @@ class FriendController extends Controller
                     'id'          => $friend->id,
                     'full_name'   => $friendData->full_name,
                     'user_name'   => $friendData->user_name,
-                    'image'       => $friendData->image
+                    'user_id'     => $friendData->id,
+                    'image'       => $friendData->image ? url('Profile/'. $friendData->image) : '',
                 ];
             });
         $totalFriendsCount = Friend::where(function ($query) use ($user_id) {
@@ -117,7 +119,6 @@ class FriendController extends Controller
             })
             ->where('is_accepted', true)
             ->count();
-            
         return response()->json([
             'total_friends' => $totalFriendsCount,
             'friends' => $friends
