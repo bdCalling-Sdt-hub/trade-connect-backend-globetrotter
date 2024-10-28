@@ -38,6 +38,7 @@ class User extends Authenticatable implements JWTSubject
         'address',
         'location',
         'privacy',
+        'balance',
     ];
     protected $casts = [
         'otp_expires_at' => 'datetime',

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\NewsFeed;
 use App\Models\Product;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,31 +28,125 @@ class SearchController extends Controller
 
         return $this->sendResponse($results, 'Search results retrieved successfully.');
     }
-    public function all(Request $request)
-    {
-        $request->validate([
-            'query' => 'required|string|min:1',
-        ]);
-        $query = $request->input('query');
 
-        $posts = $this->post($query);
-        $products = $this->product($query);
-        $people = $this->people($query);
-
-        return $this->sendResponse(compact('posts', 'products', 'people'), 'All items retrieved successfully.');
-    }
     private function post(string $query)
     {
-        return NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')->get();
+        $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')->get();
+
+        $user = Auth()->user();
+        return $newsfeeds->map(function ($newsFeed) use ($user) {
+            $userData = $newsFeed->user;
+            $decodedImages = json_decode($newsFeed->images);
+
+            return [
+                'newsfeed_id'   => $newsFeed->id,
+                'user'          => [
+                    'user_id'   => $userData->id,
+                    'full_name' => $userData->full_name,
+                    'user_name' => $userData->user_name,
+                    'image'     => $userData ? url('Profile/', $userData->image) : '',
+                ],
+                'content'         => $newsFeed->share_your_thoughts,
+                'image_count'     => count($decodedImages),
+                'images'          => collect($decodedImages)->map(fn($image) => [
+                                        'url' => $image ? url('NewsFeedImages/', $image) : '',
+                                    ])->toArray(),
+                'newsfeed_status' => $newsFeed->status ? 'active' : 'inactive',
+                'like_count'      => $newsFeed->likes->count(),
+                'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
+                'created_at'      => $newsFeed->created_at->format('Y-m-d H:i:s'),
+                'comments'        => $newsFeed->comments->map(function ($comment) {
+                    return [
+                        'id'          => $comment->id,
+                        'user_id'     => $comment->user_id,
+                        'full_name'   => $comment->user->full_name,
+                        'user_name'   => $comment->user->user_name,
+                        'image'       => $comment->user->image ? url('Profile/', $comment->user->image) : '',
+                        'comment'     => $comment->comments,
+                        'created_at'  => $this->getTimePassed($comment->created_at),
+                        'reply_count' => $comment->replies->count(),
+                        'replies'     => $comment->replies->map(function ($reply) {
+                            return [
+                                'id'        => $reply->id,
+                                'user_id'   => $reply->user_id,
+                                'full_name' => $reply->user->full_name,
+                                'user_name' => $reply->user->user_name,
+                                'image'     => $reply->user->image ? url('Profile/', $reply->user->image) : '',
+                                'comment'   => $reply->comments,
+                                'created_at'=> $this->getTimePassed($reply->created_at),
+                            ];
+                        })->toArray(),
+                    ];
+                })->toArray(),
+            ];
+        })->toArray();
     }
+
     private function product(string $query)
     {
-        return Product::where('product_name', 'like', '%' . $query . '%')->get();
+        $products = Product::where('product_name', 'like', '%' . $query . '%')->get();
+
+        return $products->map(function ($product) {
+            return [
+                'id' => $product->id,
+                'full_name' => $product->user->full_name,
+                'user_name' => $product->user->user_name,
+                'image' => $product->user->image ? url('Profile/', $product->user->image) : '',
+                'product_name' => $product->product_name,
+                'category_name' => $product->category->category_name ?? 'N/A',
+                'product_code' => $product->product_code,
+                'price' => $product->price,
+                'description' => $product->description ?? 'N/A',
+                'created_at' => $product->created_at->format('Y-m-d H:i:s'),
+                'product_images' => collect(json_decode($product->images))->map(fn($image) => $image ? url('products/', $image) : '')->toArray(),
+                'shop' => [
+                    'shop_name' => $product->shop->shop_name,
+                    'seller' => [
+                        'seller_name' => $product->shop->user->full_name,
+                    ],
+                ],
+            ];
+        })->toArray();
     }
+
     private function people(string $query)
     {
-        return User::where('user_name', 'like', '%' . $query . '%')->get();
+        $users = User::where('user_name', 'like', '%' . $query . '%')->get();
+
+        return $users->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'user_name' => $user->user_name,
+                'email' => $user->email,
+                'image' => $user->image ? url('Profile/', $user->image) : '',
+            ];
+        })->toArray();
     }
+
+    protected function getTimePassed($createdAt)
+    {
+        $now = Carbon::now();
+        $diff = $now->diff($createdAt);
+
+        if ($diff->y > 0) {
+            return $diff->y === 1 ? '1 year ago' : "{$diff->y} years ago";
+        } elseif ($diff->m > 0) {
+            return $diff->m === 1 ? '1 month ago' : "{$diff->m} months ago";
+        } elseif ($diff->d >= 7) {
+            $weeks = floor($diff->d / 7);
+            return $weeks === 1 ? '1 week ago' : "{$weeks} weeks ago";
+        } elseif ($diff->d > 0) {
+            return $diff->d === 1 ? '1 day ago' : "{$diff->d} days ago";
+        } elseif ($diff->h > 0) {
+            return $diff->h === 1 ? '1 hour ago' : "{$diff->h} hours ago";
+        } elseif ($diff->i > 0) {
+            return $diff->i === 1 ? '1 minute ago' : "{$diff->i} minutes ago";
+        } else {
+            return 'right now';
+        }
+    }
+
     public function newsfeed(Request $request)
     {
         $request->validate([
@@ -65,7 +160,6 @@ class SearchController extends Controller
         if(!$newsfeeds){
             return $this->sendError([],"No NewsFeed Found.");
         }
-
         return $this->sendResponse($newsfeeds, 'Successfully retrieved newsfeeds.');
     }
     public function products(Request $request)
