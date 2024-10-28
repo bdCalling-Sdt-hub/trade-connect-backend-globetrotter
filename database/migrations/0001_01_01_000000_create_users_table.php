@@ -15,10 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('full_name');
             $table->string('user_name')->unique();
-            $table->string('address')->nullable();
-            $table->string('location')->nullable();
             $table->string('email')->unique();
             $table->string('password');
+            $table->decimal('balance',10,2)->default(0);
+            $table->string('address')->nullable();
+            $table->string('location')->nullable();
             $table->string('bio')->nullable();
             $table->boolean('verify_email');
             $table->string('verification_token')->nullable();

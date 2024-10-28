@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\ShopController;
+use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\SupportController;
+use App\Http\Controllers\Api\WalletController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\Api\CategoryController;
@@ -23,6 +25,8 @@ use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\SocketController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\TermAndConditioncontroller;
+
+
 
 Route::group(['middleware' => ['api'],'controller' => AuthController::class], function () {
     Route::post('/register', 'register')->withoutMiddleware('jwt.auth');
@@ -168,4 +172,21 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('member')
     ->only(['index']);
 });
+
+//Payment Process for stripe
+Route::middleware(['api', 'jwt.auth','member'])->group(function () {
+    Route::post('stripe/payment-intent', [StripeController::class, 'createPaymentIntent']);
+});
+Route::middleware(['api', 'jwt.auth','member'])->group(function () {
+    Route::post('wallet-recharge', [WalletController::class, 'walletRecharge']);
+    Route::get('search-user', [WalletController::class, 'searchUser']);
+    Route::post('request-love', [WalletController::class, 'requestLove']);
+    Route::get('my-request', [WalletController::class, 'myRequest']);
+    Route::post('accept-request-love/{requestLoveId}', [WalletController::class, 'acceptRequestLove']);
+    Route::put('reject-request-love/{requestLoveId}', [WalletController::class, 'rejecttRequestLove']);
+
+    Route::post('transger-love', [WalletController::class, 'transferLove']);
+    Route::get('wallet-transger-histories', [WalletController::class, 'walletTransferHistory']);
+});
+
 
