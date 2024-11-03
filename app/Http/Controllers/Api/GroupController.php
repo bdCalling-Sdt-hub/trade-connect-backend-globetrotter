@@ -104,15 +104,28 @@ class GroupController extends Controller
     public function yourGroup(Request $request)
     {
         $userId = auth()->user()->id;
-        $groups = Group::whereHas('members', function($query) use ($userId) {
-            $query->where('created_by', $userId);
-        })->get();
+        $groups = Group::where('created_by', $userId)
+            ->with(['createdBy', 'members'])
+            ->get()
+            ->map(function ($group) {
+                return [
+                    'id' => $group->id,
+                    'group_name' => $group->name,
+                    'group_members' => $group->members()->count(),
+                    'group_image' => $group->image ? url('Groups/' . $group->image) : url('avatar/group.png'),
+                    'group_creator' => [
+                        'id' => $group->createdBy->id ?? null,
+                        'full_name' => $group->createdBy->full_name ?? 'N/A',
+                        'email' => $group->createdBy->email ?? 'N/A',
+                        'image' => $group->createdBy->image ? url('profile/',$group->createdBy->image) : url('avatar/profile.png'),
+                    ],
+                ];
+            });
         if ($groups->isEmpty()) {
             return $this->sendError('No groups found for the user.', [], 404);
         }
         return $this->sendResponse($groups, 'Groups retrieved successfully.');
     }
-
     public function groupSearch(Request $request)
     {
         $request->validate([
@@ -132,9 +145,12 @@ class GroupController extends Controller
         $request->validate([
             'keyword' => 'required|string|max:255',
         ]);
-        $users = User::where('full_name', 'like', '%' . $request->keyword . '%')
-            ->orWhere('email', 'like', '%' . $request->keyword . '%')
-            ->get();
+        $user = Auth::user();
+        $users = User::where('id', '!=', $user->id)
+                    ->where('role', 'MEMBER')
+                    ->where('full_name', 'like', '%' . $request->keyword . '%')
+                    ->orWhere('email', 'like', '%' . $request->keyword . '%')
+                    ->get();
         return $this->sendResponse($users, 'users get successfully.');
     }
     public function index()
@@ -142,8 +158,22 @@ class GroupController extends Controller
         $groups = Group::where('status', 1)->orderBy('id', 'DESC')->get();
         return $this->sendResponse($groups, 'Groups retrieved successfully.');
     }
-
-
+    public function peoples()
+    {
+        $user = Auth::user();
+        $members = User::where('id', '!=', $user->id)
+                       ->where('role', 'MEMBER')
+                       ->get()
+                       ->map(function ($member) {
+                           return [
+                               'id' => $member->id,
+                               'full_name' => $member->full_name,
+                               'user_name' => $member->user_name,
+                               'image' => $member->image ? url('profile/' . $member->image) :'',
+                           ];
+                       });
+        return $this->sendResponse($members, 'Successfully retrieved members.');
+    }
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -169,7 +199,6 @@ class GroupController extends Controller
             $group->save();
 
             $group->members()->attach($request->members);
-
             return $this->sendResponse($group, 'Group created successfully with members.');
         } catch (\Exception $e) {
             return $this->sendError('Error creating group', $e->getMessage(), 500);
@@ -181,7 +210,6 @@ class GroupController extends Controller
         if (!$group) {
             return $this->sendError('Group not found', [], 404);
         }
-
         if ($request->hasFile('image')) {
             if ($group->image) {
                 $oldImagePath = public_path('Groups/' . $group->image);
@@ -197,11 +225,8 @@ class GroupController extends Controller
         $group->image = $fileName ?? $group->image;
         $group->status = 1 ?? $group->status;
         $group->save();
-
         return $this->sendResponse($group, 'Group updated successfully.');
     }
-
-
     public function destroy($id)
     {
         $group = Group::find($id);
