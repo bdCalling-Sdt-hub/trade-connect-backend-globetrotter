@@ -94,7 +94,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::get('messageView/{id}', [MessageController::class, 'view']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
-    Route::get('search-group', [GroupController::class, 'groupSearch']);
+    // Route::get('search-group', [GroupController::class, 'groupSearch']); // not need
     Route::get('your-group', [GroupController::class, 'yourGroup']);
     Route::get('other-group', [GroupController::class, 'otherGroup']);
 
@@ -104,6 +104,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
 
     Route::get('groups', [GroupController::class, 'index']);
     Route::get('search-people', [GroupController::class, 'peopleSearch']);
+    Route::get('peoples', [GroupController::class, 'peoples']);
     Route::post('groups', [GroupController::class, 'store']);
     Route::put('groups/{id}', [GroupController::class, 'update']);
     Route::delete('groups/{id}', [GroupController::class, 'destroy']);
