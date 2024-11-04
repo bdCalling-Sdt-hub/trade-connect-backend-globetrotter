@@ -109,7 +109,7 @@ class GroupController extends Controller
             ->get()
             ->map(function ($group) {
                 return [
-                    'id' => $group->id,
+                    'group_id' => $group->id,
                     'group_name' => $group->name,
                     'group_members' => $group->members()->count(),
                     'group_image' => $group->image ? url('Groups/' . $group->image) : url('avatar/group.png'),
