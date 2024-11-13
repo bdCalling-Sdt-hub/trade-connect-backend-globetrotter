@@ -58,14 +58,11 @@ class ProductController extends Controller
                     ],
                 ];
             });
-
             return $this->sendResponse($products, 'Products retrieved successfully.');
         } catch (\Exception $e) {
             return $this->sendError('Error retrieving products', ['error' => $e->getMessage()], 500);
         }
     }
-
-
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -74,13 +71,11 @@ class ProductController extends Controller
             'product_name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'description' => 'nullable|string',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
         ]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
-
         $imageUrls = [];
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
@@ -104,17 +99,14 @@ class ProductController extends Controller
             'images' => json_encode($imageUrls),
             'status' => $request->status,
         ]);
-
         $adminUser = User::where('role', 'ADMIN')
             ->where('status', 'active')
             ->where('verify_email', 1)
             ->first();
-
         if (!$adminUser) {
             return $this->sendError([], "No Admin Users Found.");
         }
         $adminUser->notify(new ProductNotification($product));
-
         return response()->json(['data' => $product, 'message' => 'Product created successfully.'], 201);
     }
     private function generateUniqueProductCode($userId)
@@ -122,15 +114,12 @@ class ProductController extends Controller
         do {
             $productCode = Str::random(5) . $userId;
             $codeExists = Product::where('product_code', $productCode)->exists();
-
         } while ($codeExists);
-
         return $productCode;
     }
 
     public function update(Request $request, $id)
     {
-
         $product = Product::find($id);
         if (!$product) {
             return response()->json(['message' => 'Product not found.'], 404);
@@ -138,22 +127,19 @@ class ProductController extends Controller
         if ($product->status !== 'approved') {
             return response()->json(['message' => 'product not approved.'], 403);
         }
-
         $validator = Validator::make($request->all(), [
             'product_name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'product_code' =>'max:255|required|string|unique:products,product_code,' . $id,
             'category_id' => 'required|exists:categories,id',
             'description' => 'nullable|string',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
         ]);
-
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
         $newImageUrls = [];
         $oldImageUrls = json_decode($product->images, true) ?? [];
-
         if ($request->hasFile('images')) {
             foreach ($oldImageUrls as $oldImageUrl) {
                 $oldImagePath = public_path($oldImageUrl);
@@ -171,7 +157,6 @@ class ProductController extends Controller
         } else {
             $newImageUrls = $oldImageUrls;
         }
-
         $product->update([
             'category_id'=>$request->category_id ?? $product->category_id,
             'product_name' => $request->product_name ?? $product->product_name,
@@ -180,13 +165,11 @@ class ProductController extends Controller
             'description' => $request->description ?? $product->description,
             'images' => json_encode($newImageUrls),
         ]);
-
         return response()->json(['data' => $product, 'message' => 'Product updated successfully.']);
     }
     public function destroy($id)
     {
         $product = Product::find($id);
-
         if (!$product) {
             return response()->json(['message' => 'Product not found.'], 404);
         }
@@ -200,11 +183,9 @@ class ProductController extends Controller
                 unlink($imagePath);
             }
         }
-
         $product->delete();
         return response()->json(['message' => 'Product deleted successfully.']);
     }
-
     public function approved($id)
     {
         $product = Product::find($id);
@@ -213,17 +194,13 @@ class ProductController extends Controller
         }
         $product->status = 'approved';
         $product->save();
-
         $user = $product->shop->user;
-
         if (!$user) {
             return $this->sendError('Shop owner not found', [], 404);
         }
         $user->notify(new ProductApprovedNotification($product));
-
         return response()->json(['message' => 'Product approved successfully'], 200);
     }
-
     public function canceled($id)
     {
         $product = Product::find($id);
@@ -238,11 +215,8 @@ class ProductController extends Controller
             return $this->sendError('Shop owner not found', [], 404);
         }
         $user->notify(new ProductCanceledNotification($product));
-
         return response()->json(['message' => 'Product canceled successfully'], 200);
     }
-
-    // Mark a product as pending
     public function pending($id)
     {
         $product = Product::find($id);
@@ -272,12 +246,14 @@ class ProductController extends Controller
                     'product_name' => $product->product_name,
                     'full_name'     => $product->user->full_name,
                     'user_name'     => $product->user->user_name,
-                    'image'         => url('Profile/',$product->user->image),
+                    'image'=>$product->user->image ? url('profile/',$product->user->image) : url('avatar/profile.png'),
                     'product_category' => $product->category->category_name,
                     'price' => $product->price,
                     'product_status' => $product->status,
                     'description' => $product->description,
-                    'images' => json_decode($product->images),
+                    'images' => collect(json_decode($product->images))->map(function ($image) {
+                        return $image ? url("products/",$image) : url('avatar/product.png');
+                    }),
                     'shop' => [
                         'shop_name' => $product->shop->shop_name,
                         'seller' => [
@@ -296,35 +272,33 @@ class ProductController extends Controller
     {
         $userId = Auth::id();
         $shop = Shop::where('user_id', $userId)->first();
-
         if (!$shop) {
             return $this->sendError([], "No shop found for the authenticated user.");
         }
         $products = Product::where('shop_id', $shop->id)
             ->where('status', 'approved')
             ->with(['category', 'shop.user'])
-            ->orderBy('id','desc')
+            ->orderBy('id', 'desc')
             ->get();
 
         if ($products->isEmpty()) {
             return $this->sendError([], "No approved products found for the shop.");
         }
         $formattedProducts = $products->map(function ($product) {
-
             return [
                 'id' => $product->id,
                 'full_name' => $product->user->full_name,
                 'user_name' => $product->user->user_name,
-                'image' => url('Profile/',$product->user->image),
+                'image' => $product->user->image ? url('profile/', $product->user->image) : url('profile/profile.png'),
                 'product_name' => $product->product_name,
                 'category_name' => $product->category->category_name,
                 'product_code' => $product->product_code,
                 'price' => $product->price,
                 'description' => $product->description,
                 'created_at' => $product->created_at->format('Y-m-d H:i:s'),
-                'product_images' =>  collect(json_decode($product->images))->map(function ($image) {
-                                        return $image ? url("products/",$image) : '';
-                                    }),
+                'product_images' => collect(json_decode($product->images))->map(function ($image) {
+                    return $image ? url("products/", $image) : url('avatar/product.png');
+                }),
                 'shop' => [
                     'shop_name' => $product->shop->shop_name,
                     'seller' => [
@@ -335,4 +309,57 @@ class ProductController extends Controller
         });
         return $this->sendResponse($formattedProducts, 'Approved products retrieved successfully.');
     }
+    public function productSearch(Request $request)
+    {
+        try {
+            $search = $request->get('search');
+            $categoryId = $request->get('category_id');
+            $minPrice = $request->get('min_price');
+            $maxPrice = $request->get('max_price');
+
+            $products = Product::with(['shop.user', 'category'])
+                ->when($search, function ($query, $search) {
+                    $query->where('product_name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                })
+                ->when($categoryId, function ($query, $categoryId) {
+                    $query->where('category_id', $categoryId);
+                })
+                ->when($minPrice, function ($query, $minPrice) {
+                    $query->where('price', '>=', $minPrice);
+                })
+                ->when($maxPrice, function ($query, $maxPrice) {
+                    $query->where('price', '<=', $maxPrice);
+                })
+                ->orderBy('id', 'DESC')
+                ->paginate(10);
+            $formattedProducts = $products->getCollection()->map(function ($product) {
+                return [
+                    'id' => $product->id,
+                    'product_name' => $product->product_name,
+                    'full_name' => $product->user->full_name,
+                    'user_name' => $product->user->user_name,
+                    'image' => $product->user->image ? url('profile/', $product->user->image) : url('avatar/profile.png'),
+                    'product_category' => $product->category->category_name,
+                    'price' => $product->price,
+                    'product_status' => $product->status,
+                    'description' => $product->description,
+                    'images' => collect(json_decode($product->images))->map(function ($image) {
+                        return $image ? url("products/", $image) : url('avatar/product.png');
+                    }),
+                    'shop' => [
+                        'shop_name' => $product->shop->shop_name,
+                        'seller' => [
+                            'seller_name' => $product->shop->user->full_name,
+                        ],
+                    ],
+                ];
+            });
+            $paginatedData = $products->setCollection($formattedProducts);
+            return $this->sendResponse($paginatedData, 'Search results retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->sendError('Error searching products', ['error' => $e->getMessage()], 500);
+        }
+    }
+
 }

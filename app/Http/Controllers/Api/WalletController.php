@@ -33,6 +33,7 @@ class WalletController extends Controller
                 "amount"=> $request->amount,
                 "total_love"=> $request->total_love,
                 "payment_method"=> $request->payment_method,
+                "status"=> 'buy',
             ]);
             if ($wallet) {
                 $user->update([
@@ -64,11 +65,10 @@ class WalletController extends Controller
                     'full_name' => $user->full_name,
                     'user_name' => $user->user_name,
                     'email' => $user->email,
-                    'image' => $user->image ? url('Profile/', $user->image) : '',
+                    'image' => $user->image ? url('profile/', $user->image) : url('avatar/profile.png'),
                     'created_at' => $user->created_at->format('Y-m-d H:i:s'),
                 ];
             });
-
             return $this->sendResponse($userData, 'Users retrieved successfully.');
         } catch (Exception $e) {
             return $this->sendError('Error retrieving users.', $e->getMessage(), 500);
@@ -118,7 +118,7 @@ class WalletController extends Controller
                         'full_name' => $love->requestedBy->full_name,
                         'user_name' => $love->requestedBy->user_name,
                         'email' => $love->requestedBy->email,
-                        'image' => $love->requestedBy->image ? url('Profile/' . $love->requestedBy->image) : '',
+                        'image' => $love->requestedBy->image ? url('profile/' . $love->requestedBy->image) : url('avatar/profile.png'),
                     ],
                     'created_at' => $love->created_at->format('Y-m-d H:i:s'),
                 ];
@@ -145,20 +145,25 @@ class WalletController extends Controller
         }
         try {
             $user = Auth::user();
-            $wallet = Wallet::create([
-                "user_id" => $user->id,
-                "amount" => $request->amount,
-                "total_love" => $request->total_love,
-                "payment_method" => $request->payment_method,
-            ]);
-            if ($wallet) {
-                $user->decrement('balance', $request->amount);
-                $requestLove->update(['status' => 'accepted']);
-                $requestedUser = $requestLove->requestedBy;
-                $requestedUser->increment('balance', $wallet->total_love);
+            if($user->blance >= $request->total_love){
+                $wallet = Wallet::create([
+                    "user_id" => $user->id,
+                    "amount" => $request->amount,
+                    "total_love" => $request->total_love,
+                    "payment_method" => $request->payment_method,
+                    "status"=>'send'
+                ]);
+                if ($wallet) {
+                    $user->decrement('balance', $request->amount);
+                    $requestLove->update(['status' => 'accepted']);
+                    $requestedUser = $requestLove->requestedBy;
+                    $requestedUser->increment('balance', $wallet->total_love);
+                }
+                $requestedUser->notify(new ReceivedLoveNotification($wallet));
+                return $this->sendResponse($wallet, 'Wallet transfer successfully.');
+            }else{
+                return $this->sendError("Insufficient balance.");
             }
-            $requestedUser->notify(new ReceivedLoveNotification($wallet));
-            return $this->sendResponse($wallet, 'Wallet transfer successfully.');
         } catch (Exception $e) {
             return $this->sendError("Error processing the wallet recharge: " . $e->getMessage(), 500);
         }
@@ -172,7 +177,6 @@ class WalletController extends Controller
         $requestLove->update(["status"=> 'rejeted']);
         return $this->sendResponse($requestLove,'Successfully rejected request love.');
     }
-
     public function transferLove(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -186,23 +190,27 @@ class WalletController extends Controller
         }
         try {
             $user = Auth::user();
-            if ($user) {
-                $receivedId = $request->received_id;
-                $receivedUser = User::where('id', $receivedId)->first();
-                if(!$receivedUser){
-                    return $this->sendError('Received user not found.');
-                }
+            $receivedId = $request->received_id;
+            $receivedUser = User::where('id', $receivedId)->first();
+            if(!$receivedUser){
+                return $this->sendError('Received user not found.');
+            }
+            if ($user->balance >= $request->total_love) {
                 $wallet = Wallet::create([
                         "user_id" => $user->id,
                         "amount" => $request->amount,
                         "total_love" => $request->total_love,
                         "payment_method" => $request->payment_method,
+                        "status"=> "send"
                 ]);
                  $user->decrement('balance', $request->amount);
                  $receivedUser->increment('balance', $wallet->total_love);
                 $receivedUser->notify(new ReceivedLoveNotification($wallet));
+
+                return $this->sendResponse($wallet, 'Wallet transfer successfully.');
+            }else{
+                return $this->sendError("Insufficient balance.");
             }
-            return $this->sendResponse($wallet, 'Wallet transfer successfully.');
         } catch (Exception $e) {
             return $this->sendError("Error processing the wallet recharge: " . $e->getMessage(), 500);
         }
@@ -221,7 +229,7 @@ class WalletController extends Controller
         $formattedWallets = $wallets->map(function ($wallet) {
             return [
                 'id' => $wallet->id,
-                'amount' => number_format($wallet->amount, 2),
+                'amount' => $wallet->amount,
                 'total_love' => $wallet->total_love,
                 'payment_method' => ucfirst($wallet->payment_method),
                 'user' => [
@@ -229,14 +237,15 @@ class WalletController extends Controller
                     'full_name' => $wallet->user->full_name,
                     'user_name' => $wallet->user->user_name,
                     'email' => $wallet->user->email,
-                    'image' => $wallet->user->image ? url('Profile/'. $wallet->user->image) :'',
+                    'image' => $wallet->user->image ? url('profile/'. $wallet->user->image) : url('avatar/profile.png'),
                 ],
+                'status' => ucfirst($wallet->status),
                 'created_at' => $wallet->created_at->format('Y-m-d H:i:s'),
             ];
         });
         return $this->sendResponse([
-            'user_balance'=> $user->balance ?? 0,
-            'transaction' => $formattedWallets,
+            'user_balance'=> number_format($user->balance) ?? 0,
+            'transactions' => $formattedWallets,
             'pagination' => [
                 'total' => $wallets->total(),
                 'current_page' => $wallets->currentPage(),
@@ -245,8 +254,66 @@ class WalletController extends Controller
             ]
         ], "Transaction history retrieved successfully.");
     }
-
-
-
-
+    public function transitions()
+    {
+        try {
+            $wallets = Wallet::orderBy('id', 'desc')->get();
+            if ($wallets->isEmpty()) {
+                return $this->sendError([], "No wallet transactions found.");
+            }
+            $formattedWallets = $wallets->map(function ($wallet) {
+                return [
+                    'id' => $wallet->id,
+                    'user' => [
+                        'id' => $wallet->user_id,
+                        'full_name' => $wallet->user->full_name,
+                        'user_name' => $wallet->user->user_name,
+                        'email' => $wallet->user->email,
+                        'balance' => $wallet->user->balance,
+                        'image' => $wallet->user->image
+                            ? url('profile/', $wallet->user->image)
+                            : url('avatar/profile.png'),
+                    ],
+                    'payment_method' => $wallet->payment_method,
+                    'total_love' => $wallet->total_love,
+                    'amount' => $wallet->amount,
+                    'status' => $wallet->status,
+                    'created_at' => $wallet->created_at->format('Y-m-d H:i:s'),
+                ];
+            });
+            $today = now();
+            $newUsers = [
+                'week' => User::where('created_at', '>=', $today->copy()->subWeek())->count(),
+                'month' => User::where('created_at', '>=', $today->copy()->subMonth())->count(),
+                'year' => User::where('created_at', '>=', $today->copy()->subYear())->count(),
+            ];
+            $activeUsers = User::where('status', 'active')->count();
+            $transactions = [
+                'week' => Wallet::where('created_at', '>=', $today->copy()->subWeek())->count(),
+                'month' => Wallet::where('created_at', '>=', $today->copy()->subMonth())->count(),
+                'year' => Wallet::where('created_at', '>=', $today->copy()->subYear())->count(),
+            ];
+            $totalTransactions = Wallet::count();
+            $revenue = [
+                'week' => Wallet::where('created_at', '>=', $today->copy()->subWeek())->sum('amount'),
+                'month' => Wallet::where('created_at', '>=', $today->copy()->subMonth())->sum('amount'),
+                'year' => Wallet::where('created_at', '>=', $today->copy()->subYear())->sum('amount'),
+            ];
+            $totalRevenue = Wallet::sum('amount');
+            $response = [
+                'transitions' => $formattedWallets,
+                'statistics' => [
+                    'new_users' => $newUsers,
+                    'active_users' => $activeUsers,
+                    'transactions' => $transactions,
+                    'total_transactions' => $totalTransactions,
+                    'revenue' => $revenue,
+                    'total_revenue' => $totalRevenue,
+                ]
+            ];
+            return $this->sendResponse($response, 'Wallet transactions and statistics retrieved successfully.');
+        } catch (Exception $e) {
+            return $this->sendError('Error retrieving wallet transactions and statistics', ['error' => $e->getMessage()], 500);
+        }
+    }
 }

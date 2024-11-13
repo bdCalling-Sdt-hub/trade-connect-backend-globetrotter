@@ -110,7 +110,7 @@ class FriendController extends Controller
                     'full_name'   => $friendData->full_name,
                     'user_name'   => $friendData->user_name,
                     'user_id'     => $friendData->id,
-                    'image'       => $friendData->image ? url('Profile/'. $friendData->image) : '',
+                    'image'       => $friendData->image ? url('profile/'. $friendData->image) : url('avatar/profile.png'),
                 ];
             });
         $totalFriendsCount = Friend::where(function ($query) use ($user_id) {

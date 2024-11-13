@@ -35,5 +35,25 @@ class DatabaseSeeder extends Seeder
         'role'=>'MEMBER',
         'status'=>'active'
        ]);
+       User::create([
+        'id'=>3,
+        'full_name'=>"User2",
+        'user_name'=>"user2",
+        'email'=>"user2@gmail.com",
+        'password'=>Hash::make(12345678),
+        'verify_email'=>1,
+        'role'=>'MEMBER',
+        'status'=>'active'
+       ]);
+       User::create([
+        'id'=>4,
+        'full_name'=>"User3",
+        'user_name'=>"user3",
+        'email'=>"user3@gmail.com",
+        'password'=>Hash::make(12345678),
+        'verify_email'=>1,
+        'role'=>'MEMBER',
+        'status'=>'active'
+       ]);
     }
 }

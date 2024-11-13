@@ -13,6 +13,7 @@ class Wallet extends Model
         "payment_method",
         "total_love",
         "amount",
+        "status"
 
     ];
     public function user()

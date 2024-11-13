@@ -4,46 +4,58 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Message;
+use App\Models\User;
+use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class MessageController extends Controller
 {
-    public function getMessage()
+    public function getMessage(Request $request)
     {
-        $userId = auth()->id();
-        try {
-            $messages = Message::where(function ($query) use ($userId) {
-                    $query->where('sender_id', $userId)
-                        ->orWhere('receiver_id', $userId);
-                })
-                ->with(['sender', 'receiver'])
-                ->orderBy('created_at', 'desc')
-                ->get();
-            if ($messages->isEmpty()) {
-                return $this->sendError('No messages found.');
-            }
-            $formattedMessages = $messages->map(function ($message) {
-                $decodedImages = json_decode($message->images, true);
-                return [
-                    'id' => $message->id,
-                    'message' => $message->message,
-                   'images' => is_array($decodedImages) ? array_map(function ($image) {
-                                        return url('message/' . $image);
-                                    }, $decodedImages) : [],
-                    'is_read' => $message->is_read,
-                    'created_at' => $message->created_at->format('Y-m-d H:i:s'),
-                    'sender' => $this->formatUser($message->sender),
-                    'receiver' => $this->formatUser($message->receiver),
-                ];
-            });
-            return $this->sendResponse($formattedMessages, 'Messages retrieved successfully.');
-        } catch (\Exception $e) {
-            return $this->sendError('An error occurred while retrieving messages: ' . $e->getMessage());
+        $validator = Validator::make($request->all(), [
+            'receiver_id' => 'required|exists:users,id',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
         }
+        $authUserId = Auth::id();
+        $receiverId = $request->receiver_id;
+        $messages = Message::with(['sender', 'receiver'])
+            ->where(function ($query) use ($authUserId, $receiverId) {
+                $query->where('sender_id', $authUserId)
+                    ->where('receiver_id', $receiverId);
+            })
+            ->orWhere(function ($query) use ($authUserId, $receiverId) {
+                $query->where('sender_id', $receiverId)
+                    ->where('receiver_id', $authUserId);
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($request->per_page);
+        if ($messages->isEmpty()) {
+            return $this->sendError([], 'No messages found.');
+        }
+        $formattedMessages = $messages->map(function ($message) {
+            $imageCollection = collect(json_decode($message->images, true) ?? []);
+            return [
+                'id' => $message->id,
+                'message' => $message->message,
+                'images' => $imageCollection->map(function ($image) {
+                    return $image ? url("message/", $image) :null;
+                }),
+                'is_read' => $message->is_read,
+                'created_at' => $message->created_at->format('Y-m-d H:i:s'),
+                'sender' => [
+                    'id' => $message->sender->id,
+                    'full_name' => $message->sender->full_name,
+                    'email' => $message->sender->email,
+                    'image' => $message->sender->image ? url('Profile/' . $message->sender->image) : url('avatar/profile.png'),
+                ],
+            ];
+        });
+        return $this->sendResponse($formattedMessages, 'Messages retrieved successfully.');
     }
-
     private function formatUser($user)
     {
         return [
@@ -51,7 +63,7 @@ class MessageController extends Controller
             'full_name' => $user->full_name,
             'user_name' => $user->user_name,
             'email' => $user->email,
-            'image' => $user->image ? url('profile/' . $user->image) : '',
+            'image' => $user->image ? url('profile/' . $user->image) : url('avatar/profile.png'),
         ];
     }
     public function store(Request $request)
@@ -116,6 +128,53 @@ public function destroy($id)
         } catch (\Exception $e) {
             return $this->sendError('Error deleting message.', $e->getMessage(), 500);
         }
+    }
+    public function userChat()
+    {
+        $userId = Auth::id();
+        $members = Message::where('sender_id', $userId)
+            ->orWhere('receiver_id', $userId)
+            ->select('sender_id', 'receiver_id')
+            ->distinct()
+            ->get()
+            ->flatMap(function ($message) use ($userId) {
+                return [$message->sender_id === $userId ? $message->receiver_id : $message->sender_id];
+            })
+            ->unique();
+        $userMembers = User::whereIn('id', $members)->get();
+        if ($userMembers->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'data' => [],
+                'message' => 'User not found.'
+            ]);
+        }
+        $formattedMembers = $userMembers->map(function ($user) use ($userId) {
+            $lastMessage = Message::where(function ($query) use ($userId, $user) {
+                    $query->where('sender_id', $userId)->where('receiver_id', $user->id);
+                })
+                ->orWhere(function ($query) use ($userId, $user) {
+                    $query->where('sender_id', $user->id)->where('receiver_id', $userId);
+                })
+                ->orderBy('created_at', 'desc')
+                ->first();
+            $unreadCount = Message::where(function ($query) use ($userId, $user) {
+                    $query->where('sender_id', $user->id)->where('receiver_id', $userId);
+                })
+                ->where('is_read', false)
+                ->count();
+            return [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'user_name' => $user->user_name,
+                'email' => $user->email,
+                'image' => $user->image ? url('profile/', $user->image) : url('avatar/', 'profile.png'),
+                'last_message' => $lastMessage ? $lastMessage->message : null,
+                'last_message_time' => $lastMessage ? $lastMessage->created_at : null,
+                'unread_count' => $unreadCount,
+            ];
+        });
+        return $this->sendResponse($formattedMembers, 'Chat members retrieved successfully.');
     }
 }
 

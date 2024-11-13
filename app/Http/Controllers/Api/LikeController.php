@@ -46,25 +46,34 @@ class LikeController extends Controller
             return $this->sendResponse($like, "Like successfully added.");
         }
     }
-    public function getNewsfeedLikes()
+    public function getNewsfeedLikes(Request $request)
     {
-        $newsfeeds = NewsFeed::all();
-        $newsfeedsLikes = [];
-        foreach ($newsfeeds as $newsfeed) {
-            $likes = Like::where('newsfeed_id', $newsfeed->id)->get();
-
-            $newsfeedsLikes[] = [
-                'newsfeed_id' => $newsfeed->id,
-                'likes' => $likes
-            ];
+        $validator = Validator::make($request->all(), [
+            'newsfeed_id' => 'required|exists:news_feeds,id',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
         }
-        if (empty($newsfeedsLikes)) {
+        $authUserId = Auth::id();
+        $newsfeedsLikes = NewsFeed::withCount('likes')
+            ->with(['likes' => function($query) use ($authUserId) {
+                $query->where('user_id', $authUserId);
+            }])
+            ->where('id', $request->newsfeed_id)
+            ->get()
+            ->map(function ($newsfeed) use ($authUserId) {
+                $authUserLiked = $newsfeed->likes->contains('user_id', $authUserId);
+                return [
+                    'newsfeed_id' => $newsfeed->id,
+                    'like_count' => $newsfeed->likes_count,
+                    'auth_user_liked' => $authUserLiked,
+                ];
+            });
+        if ($newsfeedsLikes->isEmpty()) {
             return $this->sendError("No newsfeed likes found.");
         }
         return $this->sendResponse($newsfeedsLikes, 'Likes for all newsfeeds retrieved successfully.');
     }
-
-
 }
 
 

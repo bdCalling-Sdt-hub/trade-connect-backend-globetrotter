@@ -76,29 +76,26 @@ class GroupController extends Controller
     public function otherGroup(Request $request)
     {
         $userId = auth()->user()->id;
-        $groups = Group::whereDoesntHave('members', function ($query) use ($userId) {
-            $query->where('user_id', $userId);
-        })->with(['createdBy', 'members'])
-          ->get();
+        $groups = Group::where('created_by','!=',$userId)->orderBy('id','desc')->get();
         if ($groups->isEmpty()) {
             return $this->sendError('No other groups found.', [], 404);
         }
-        $groups->transform(function ($group) {
+        $formattedGroups = $groups->map(function ($group) {
             return [
                 'id' => $group->id,
                 'name' => $group->name,
-                'image' => $group->image ? url('Groups/' . $group->image) : '',
+                'image' => $group->image ? url('Groups/' . $group->image) : url('avatar/group.png'),
                 'created_by' => [
                     'id' => $group->createdBy->id,
                     'full_name' => $group->createdBy->full_name,
                     'user_name' => $group->createdBy->user_name,
                     'email' => $group->createdBy->email,
-                    'image' => $group->createdBy->image ? url('Profile/' . $group->createdBy->image) : '',
+                    'image' => $group->createdBy->image ? url('Profile/' . $group->createdBy->image) : url('avatar/profile.png'),
                 ],
                 'member_count' => $group->members->count(),
             ];
         });
-        return $this->sendResponse($groups, 'Other groups retrieved successfully.');
+        return $this->sendResponse($formattedGroups, 'Other groups retrieved successfully.');
     }
 
     public function yourGroup(Request $request)
@@ -106,6 +103,7 @@ class GroupController extends Controller
         $userId = auth()->user()->id;
         $groups = Group::where('created_by', $userId)
             ->with(['createdBy', 'members'])
+            ->orderBy('id','desc')
             ->get()
             ->map(function ($group) {
                 return [
@@ -116,6 +114,7 @@ class GroupController extends Controller
                     'group_creator' => [
                         'id' => $group->createdBy->id ?? null,
                         'full_name' => $group->createdBy->full_name ?? 'N/A',
+                        'user_name' => $group->createdBy->user_name ?? 'N/A',
                         'email' => $group->createdBy->email ?? 'N/A',
                         'image' => $group->createdBy->image ? url('profile/',$group->createdBy->image) : url('avatar/profile.png'),
                     ],
@@ -150,13 +149,16 @@ class GroupController extends Controller
                     ->where('role', 'MEMBER')
                     ->where('full_name', 'like', '%' . $request->keyword . '%')
                     ->orWhere('email', 'like', '%' . $request->keyword . '%')
-                    ->get();
+                    ->get()
+                    ->map(function ($member) {
+                        return [
+                            'id' => $member->id,
+                            'full_name' => $member->full_name,
+                            'user_name' => $member->user_name,
+                            'image' => $member->image ? url('profile/' . $member->image) : url('avatar/profile.png'),
+                        ];
+                    });
         return $this->sendResponse($users, 'users get successfully.');
-    }
-    public function index()
-    {
-        $groups = Group::where('status', 1)->orderBy('id', 'DESC')->get();
-        return $this->sendResponse($groups, 'Groups retrieved successfully.');
     }
     public function peoples()
     {
@@ -169,7 +171,7 @@ class GroupController extends Controller
                                'id' => $member->id,
                                'full_name' => $member->full_name,
                                'user_name' => $member->user_name,
-                               'image' => $member->image ? url('profile/' . $member->image) :'',
+                               'image' => $member->image ? url('profile/' . $member->image) : url('avatar/profile.png'),
                            ];
                        });
         return $this->sendResponse($members, 'Successfully retrieved members.');
@@ -204,9 +206,9 @@ class GroupController extends Controller
             return $this->sendError('Error creating group', $e->getMessage(), 500);
         }
     }
-    public function update(Request $request, $id)
+    public function update(Request $request)
     {
-        $group = Group::find($id);
+        $group = Group::find($request->groupId);
         if (!$group) {
             return $this->sendError('Group not found', [], 404);
         }
@@ -227,11 +229,14 @@ class GroupController extends Controller
         $group->save();
         return $this->sendResponse($group, 'Group updated successfully.');
     }
-    public function destroy($id)
+    public function destroy(Request $request)
     {
-        $group = Group::find($id);
+        $group = Group::find($request->groupId);
         if (!$group) {
             return $this->sendError('Group not found', [], 404);
+        }
+        if ($group->created_by !== auth()->id()) {
+            return $this->sendError('You are not eligible to delete the group.', [], 403);
         }
         if ($group->image) {
             $imagePath = public_path('groups/' . $group->image);
@@ -239,37 +244,41 @@ class GroupController extends Controller
                 unlink($imagePath);
             }
         }
+        $group->groupMembers()->delete();
+        $group->messages()->delete();
         $group->delete();
-
         return $this->sendResponse([], 'Group deleted successfully.');
     }
-
-    public function addMembers(Request $request, Group $group)
+    public function addMembers(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'user_ids' => 'required|array',
             'user_ids.*' => 'required|exists:users,id',
+            'user_ids'=>'array',
+            'group_id' => 'required|exists:groups,id',
         ]);
-
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 400);
         }
-
-        $userIds = $request->user_ids;
-        $existingMembers = $group->members()->whereIn('user_id', $userIds)->pluck('user_id')->toArray();
-
-        if (count($existingMembers) === count($userIds)) {
-            return $this->sendError('All selected users are already members of this group.', [], 400);
+        $group = Group::find($request->group_id);
+        if (!$group) {
+            return $this->sendError('Group not found.', [], 404);
         }
+        $userIds = $request->user_ids;
 
-        $newMembers = array_diff($userIds, $existingMembers);
-        $group->members()->attach($newMembers);
-
+        $group->members()->syncWithoutDetaching($userIds);
         return $this->sendResponse($group->load('members'), 'Members added to group successfully.', 201);
     }
-
-    public function removeMember($groupId, $userId)
+    public function removeMember(Request $request)
     {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required|exists:users,id',
+            'group_id' => 'required|exists:groups,id',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 400);
+        }
+        $groupId = $request->group_id;
+        $userId = $request->user_id;
         $group = Group::find($groupId);
         if (!$group) {
             return $this->sendError('Group not found', [], 404);
@@ -279,92 +288,155 @@ class GroupController extends Controller
             return $this->sendError('User is not a member of this group', [], 400);
         }
         $group->members()->detach($userId);
-
-        return $this->sendResponse($group->load('members'), 'Member removed from group successfully.');
+        return $this->sendResponse([], 'Member removed from group successfully.');
     }
-    public function groupMembers($groupId)
+    public function leaveGroup(Request $request)
     {
-        $group = Group::find($groupId);
-
+        $user = Auth::user();
+        $validator = Validator::make($request->all(), [
+            'group_id' => 'required|exists:groups,id',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 400);
+        }
+        $groupId = $request->group_id;
+        $isMember = GroupMember::where('group_id', $groupId)
+            ->where('user_id', $user->id)
+            ->exists();
+        if (!$isMember) {
+            return $this->sendError('You are not a member of this group.', 404);
+        }
+        GroupMember::where('group_id', $groupId)
+            ->where('user_id', $user->id)
+            ->delete();
+        return $this->sendResponse([], 'Successfully left the group.');
+    }
+    public function groupMembers(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'group_id' => 'required|exists:groups,id',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 400);
+        }
+        $group = Group::with('members')->find($request->group_id);
         if (!$group) {
             return $this->sendError('Group not found', [], 404);
         }
-        return $this->sendResponse($group->load('members'), 'Group members retrieved successfully.');
+        $membersData = $group->members->map(function ($member) {
+            return [
+                'user_id' => $member->id,
+                'full_name' => $member->full_name,
+                'email' => $member->email,
+                'image' => $member->image ? url('profile/', $member->image) : url('avatar/profile.png'),
+            ];
+        });
+        $responseData = [
+            'group_id' => $group->id,
+            'group_name' => $group->name,
+            'members' => $membersData,
+        ];
+        return $this->sendResponse($responseData, 'Group members retrieved successfully.');
     }
-
-    public function groupMessage(Request $request, $groupId)
+    public function sendGroupMessage(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'message' => 'required|string|max:500',
-            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'group_id' => 'required|exists:groups,id',
+            'message' => 'required|string',
+            'images' => 'nullable|array',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
-        $images = [];
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
-                $filePath = time().'.'.$image->getClientOriginalExtension();
-                $image->move(public_path('GroupMessage'),$filePath);
-                $images[] = $filePath;
+        $groupMessage = new GroupMessage();
+        $groupMessage->group_id = $request->group_id;
+        $groupMessage->sender_id = Auth::user()->id;
+        $groupMessage->message = $request->message;
 
+        if ($request->has('images')) {
+            $imagePaths = [];
+            foreach ($request->images as $image) {
+                $fileName = time() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('GroupMessages'), $fileName);
+                $imagePaths[] = $fileName;
             }
+            $groupMessage->images = json_encode($imagePaths);
         }
-        $groupMessage = GroupMessage::create([
-            'group_id' => $request->groupId,
-            'sender_id' => auth()->id(),
-            'message' => $request->message,
-            'images' => json_encode($images),
-        ]);
-
-        return $this->sendResponse($groupMessage->load('sender'), 'Message stored successfully.', 201);
+        $groupMessage->save();
+        $formattedMessage = [
+            'message_id' => $groupMessage->id,
+            'message' => $groupMessage->message,
+            'sender' => [
+                    'id' => $groupMessage->sender->id,
+                    'full_name' => $groupMessage->sender->full_name,
+                    'image' => $groupMessage->sender->image ? url('profile/',$groupMessage->sender->image) : url('avatar/profile.png'),
+                ],
+            'images' => array_map(function ($image) {
+                return url('GroupMessages/' . $image);
+            }, json_decode($groupMessage->images, true) ?? []),
+            'created_at' => $groupMessage->created_at->format('Y-m-d H:i:s'),
+        ];
+        return $this->sendResponse(['message'=>$formattedMessage], 'Message sent successfully.');
     }
-
-    public function getMessages($groupId)
+    public function getMessages(Request $request)
     {
+        $groupId = $request->groupId;
         $validator = Validator::make(['group_id' => $groupId], [
             'group_id' => 'required|exists:groups,id',
         ]);
-
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
-
-        $messages = Group::find($groupId)->messages()->with('sender')->get();
-
-        return $this->sendResponse($messages, 'Messages retrieved successfully.');
+        $messages = Group::findOrFail($groupId)->messages()->with('sender')->get();
+        $formattedMessages = $messages->map(function ($message) {
+            return [
+                'message_id' => $message->id,
+                'message' => $message->message,
+                'images' => collect(json_decode($message->images))->map(function ($image) {
+                      return $image
+                          ? url('GroupMessages/', $image)
+                          : url('avatar/group.png');
+                  })->toArray(),
+                'sender' => [
+                    'id' => $message->sender->id,
+                    'full_name' => $message->sender->full_name,
+                    'image' => $message->sender->image ? url('profile/',$message->sender->image) : url('avatar/profile.png'),
+                ],
+                'created_at' => $message->created_at,
+                'updated_at' => $message->updated_at,
+            ];
+        });
+        $unreadMessageCount = $messages->where('sender_id', '!=', Auth::id())->where('is_read', false)->count();
+        return $this->sendResponse([
+            'messages' => $formattedMessages,
+            'unreadMessageCount' => $unreadMessageCount,
+        ], 'Messages retrieved successfully.');
     }
-
     public function markAsRead($messageId)
     {
         $message = GroupMessage::find($messageId);
-
         if (!$message) {
             return $this->sendError('Message not found', [], 404);
         }
-
         $message->is_read = !$message->is_read;
         $message->save();
-
-        return $this->sendResponse($message, 'Message read status updated successfully.');
+        return $this->sendResponse([], 'Message read successfully.');
     }
     public function deleteMessage($messageId)
     {
         $message = GroupMessage::find($messageId);
-
         if (!$message) {
             return $this->sendError('Message not found', [], 404);
         }
         if ($message->images) {
             $imagePaths = json_decode($message->images, true);
-
             foreach ($imagePaths as $imagePath) {
                 $fileName = basename($imagePath);
                 Storage::delete('GroupMessage/' . $fileName);
             }
         }
         $message->delete();
-
         return $this->sendResponse(null, 'Message and associated images deleted successfully.');
     }
 }

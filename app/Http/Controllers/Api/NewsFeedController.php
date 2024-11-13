@@ -57,7 +57,7 @@ class NewsFeedController extends Controller
                 'newsfeed_status' => $newsFeed->status ? 'active' : 'inactive',
                 'like_count'      => $newsFeed->likes->count(),
                 'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
-               'created_at' => $newsFeed->created_at->format('Y-m-d H:i:s'),
+                'created_at' => $newsFeed->created_at->format('Y-m-d H:i:s'),
                 'comments'        => $newsFeed->comments->transform(function ($comment) {
                     return [
                         'id'          => $comment->id,

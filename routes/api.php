@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\LikeController;
 use App\Http\Controllers\Api\LoveController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\ShopController;
@@ -73,12 +74,12 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);
-    Route::get('getNewsfeedlikes', [LikeController::class, 'getNewsfeedLikes']);
+    Route::get('get-newsfeed-like', [LikeController::class, 'getNewsfeedLikes']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::post('comment', [CommentController::class, 'store']);
     Route::put('comment/{id}', [CommentController::class, 'update']);
-    // Route::get('commentView/{newsfeedId}', [CommentController::class, 'commentView']);
+    Route::get('get-comment/{newsfeedId}', [CommentController::class, 'getComment']);
     Route::delete('commentDelete/{id}', [CommentController::class, 'destroy']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
@@ -92,6 +93,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::get('getMessage', [MessageController::class, 'getMessage']);
     Route::delete('deleteMessage/{id}', [MessageController::class, 'destroy']);
     Route::get('messageView/{id}', [MessageController::class, 'view']);
+    Route::get('user-chat', [MessageController::class, 'userChat']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     // Route::get('search-group', [GroupController::class, 'groupSearch']); // not need
@@ -101,21 +103,21 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::post('join-group-request', [GroupController::class, 'joinGroupRequest']);
     Route::post('accept-join-request/{id}', [GroupController::class, 'acceptJoinRequest']);
 
-
     Route::get('groups', [GroupController::class, 'index']);
     Route::get('search-people', [GroupController::class, 'peopleSearch']);
     Route::get('peoples', [GroupController::class, 'peoples']);
     Route::post('groups', [GroupController::class, 'store']);
-    Route::put('groups/{id}', [GroupController::class, 'update']);
-    Route::delete('groups/{id}', [GroupController::class, 'destroy']);
+    Route::put('update-group', [GroupController::class, 'update']);
+    Route::delete('delete-group', [GroupController::class, 'destroy']);
 
-    Route::get('groups/{group}/members', [GroupController::class, 'groupMembers']);
-    Route::post('groups/{group}/members', [GroupController::class, 'addMembers']);
-    Route::delete('groups/{group}/members/{user}', [GroupController::class, 'removeMember']);
+    Route::get('group-members', [GroupController::class, 'groupMembers']);
+    Route::put('add-group-members', [GroupController::class, 'addMembers']);
+    Route::delete('remove-group-member', [GroupController::class, 'removeMember']);
+    Route::delete('leave-group', [GroupController::class, 'leaveGroup']);
 
-    Route::post('groups/{group}/messages', [GroupController::class, 'groupMessage']);
-    Route::get('groups/{group}/messages', [GroupController::class, 'getMessages']);
-    Route::patch('group-messages/{messageId}/read', [GroupController::class, 'markAsRead']);
+    Route::post('send-group-messages', [GroupController::class, 'sendGroupMessage']);
+    Route::get('get-group-messages', [GroupController::class, 'getMessages']);
+    Route::patch('group-messages-read/{messageId}/', [GroupController::class, 'markAsRead']);
     Route::delete('group-messages/{messageId}', [GroupController::class, 'deleteMessage']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
@@ -136,47 +138,17 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::get('/all', [SearchController::class, 'all']);
     Route::get('/post', [SearchController::class, 'newsfeed']);
     Route::get('/product', [SearchController::class, 'products']);
-    Route::get('/people', [SearchController::class, 'peoples']);
-});
-                        /* --- Admin  */
-Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
-    Route::apiResource('categories', CategoryController::class);
+    // Route::get('/people', [SearchController::class, 'peoples']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
-    Route::apiResource('products', ProductController::class);
-    Route::get('userproducts', [ProductController::class, 'userproducts']);
-    Route::get('productList', [ProductController::class, 'productList']);
-    Route::post('approved/{id}', [ProductController::class, 'approved']);
-    Route::post('canceled/{id}', [ProductController::class, 'canceled']);
-    Route::post('pending/{id}', [ProductController::class, 'pending']);
-    Route::get('categories', [ProductController::class, 'categories']);
-});
-Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
-    Route::get('userList', [AuthController::class, 'userList']);
-    Route::get('searchUser', [AuthController::class, 'searchUser']);
-    Route::get('userProducts', [AuthController::class, 'userProducts']);
-    Route::post('users/{id}/role', [AuthController::class, 'updateRole']);
-    Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
-});
-Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
-    Route::apiResource('love', LoveController::class);
-});
-Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
-    Route::get('activeUser', [DashboardController::class,'activeUser']);
-});
-Route::middleware(['api', 'jwt.auth'])->group(function () {
-    Route::put('personalInformation', [SettingController::class,'personalInformation'])->middleware('admin');
-    Route::get('getpersonalInformation', [SettingController::class,'getPersonalInformation'])->middleware('admin');
-    Route::apiResource('faqs',FaqController::class)->middleware('member');
-    Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('admin')
-    ->only(['index','store','update','destroy']);
-    Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('member')
-    ->only(['index']);
-});
+    Route::post('order', [OrderController::class, 'order']);
+    Route::get('get-user-order', [OrderController::class, 'getUserOrder']);
+    Route::put('cancel-order', [OrderController::class, 'cancelOrder']);
+    Route::put('accept-delivery', [OrderController::class, 'acceptDelivery']);
 
-//Payment Process for stripe
-Route::middleware(['api', 'jwt.auth','member'])->group(function () {
-    Route::post('stripe/payment-intent', [StripeController::class, 'createPaymentIntent']);
+    Route::get('get-seller-order', [OrderController::class, 'getSellerOrder']);
+    Route::put('accept-order', [OrderController::class, 'acceptOrder']);
+    Route::put('delivery-request', [OrderController::class, 'deliveryRequest']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->group(function () {
     Route::post('wallet-recharge', [WalletController::class, 'walletRecharge']);
@@ -189,5 +161,45 @@ Route::middleware(['api', 'jwt.auth','member'])->group(function () {
     Route::post('transger-love', [WalletController::class, 'transferLove']);
     Route::get('wallet-transger-histories', [WalletController::class, 'walletTransferHistory']);
 });
-
-
+                        /* --- Admin  */
+Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
+    Route::apiResource('categories', CategoryController::class);
+});
+Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
+    Route::apiResource('products', ProductController::class);
+    Route::get('userproducts', [ProductController::class, 'userproducts']);
+    Route::get('productList', [ProductController::class, 'productList']);
+    Route::get('product-search', [ProductController::class, 'productSearch']);
+    Route::put('approved/{id}', [ProductController::class, 'approved']);
+    Route::put('canceled/{id}', [ProductController::class, 'canceled']);
+    Route::put('pending/{id}', [ProductController::class, 'pending']);
+    Route::get('categories', [ProductController::class, 'categories']);
+});
+Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
+    Route::get('userList', [AuthController::class, 'userList']);
+    Route::get('searchUser', [AuthController::class, 'searchUser']);
+    Route::get('user-details', [AuthController::class, 'userDetails']);
+    Route::put('update-role/{id}', [AuthController::class, 'updateRole']);
+    Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
+});
+Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
+    Route::apiResource('love', LoveController::class);
+});
+Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
+    Route::get('dashboard', [DashboardController::class,'dashboard']);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::put('personalInformation', [SettingController::class,'personalInformation'])->middleware('admin');
+    Route::get('getpersonalInformation', [SettingController::class,'getPersonalInformation'])->middleware('admin');
+    Route::apiResource('faqs',FaqController::class)->middleware('member');
+    Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('admin')
+    ->only(['index','store','update','destroy']);
+    Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('member')
+    ->only(['index']);
+});
+Route::middleware(['api', 'jwt.auth','member'])->group(function () {
+    Route::post('stripe/payment-intent', [StripeController::class, 'createPaymentIntent']);
+});
+Route::middleware(['api', 'jwt.auth', 'admin'])->group(function () {
+    Route::get('transitions', [WalletController::class, 'transitions']);
+});
