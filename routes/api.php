@@ -24,7 +24,6 @@ use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NewsFeedController;
 use App\Http\Controllers\Api\SettingController;
-use App\Http\Controllers\Api\SocketController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\TermAndConditioncontroller;
 
@@ -96,7 +95,6 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::get('user-chat', [MessageController::class, 'userChat']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
-    // Route::get('search-group', [GroupController::class, 'groupSearch']); // not need
     Route::get('your-group', [GroupController::class, 'yourGroup']);
     Route::get('other-group', [GroupController::class, 'otherGroup']);
 
@@ -138,7 +136,6 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::get('/all', [SearchController::class, 'all']);
     Route::get('/post', [SearchController::class, 'newsfeed']);
     Route::get('/product', [SearchController::class, 'products']);
-    // Route::get('/people', [SearchController::class, 'peoples']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::post('order', [OrderController::class, 'order']);
