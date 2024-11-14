@@ -10,26 +10,17 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    public function getAllNotifications()
+    public function notifications()
     {
         $user = Auth::user();
-        $notifications = $user->notifications()->with('notifiable:id,full_name,image,user_name')->get()->map(function ($notification) {
-        $likedUser = User::find($notification->data['user_id']);
+        $notifications = $user->notifications;
+        $notificationCount = $notifications->count();
 
-            return [
-                'id' => $notification->id,
-                'type' => $notification->type,
-                'data' => $notification->data,
-                'created_at' => $notification->created_at,
-                'read_at' => $notification->read_at,
-                'full_name' => $likedUser->full_name ?? 'N/A',
-                'image' => url('Profile/',$likedUser->image) ?? null,
-                'user_name' => $likedUser->user_name ?? 'N/A',
-
-            ];
-        });
-
-        return $this->sendResponse($notifications, 'All notifications retrieved successfully.');
+        return response()->json([
+            'success' => true,
+            'count' => $notificationCount,
+            'data' => $notifications,
+        ]);
     }
 
     public function getUnreadNotifications()
@@ -47,7 +38,7 @@ class NotificationController extends Controller
                 'full_name' => $likedUser->full_name ?? 'N/A',
                 'image' => $likedUser->image ?? null,
                 'user_name' => $likedUser->user_name ?? 'N/A',
-                
+
             ];
         });
 

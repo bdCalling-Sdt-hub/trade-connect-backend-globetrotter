@@ -25,8 +25,6 @@ class CategoryController extends Controller
             return $this->sendError('Error retrieving categories', ['error' => $e->getMessage()], 500);
         }
     }
-
-
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -69,8 +67,6 @@ class CategoryController extends Controller
             return $this->sendError('Error updating category', ['error' => $e->getMessage()], 500);
         }
     }
-
-
     public function destroy($id)
     {
         $category = Category::find($id);

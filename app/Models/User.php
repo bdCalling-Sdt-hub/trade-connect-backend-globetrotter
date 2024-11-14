@@ -127,9 +127,13 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Comment::class);
     }
     public function members()
-{
-    return $this->belongsToMany(User::class, 'group_members', 'group_id', 'user_id');
-}
+    {
+        return $this->belongsToMany(User::class, 'group_members', 'group_id', 'user_id');
+    }
+    public function shop()
+    {
+        return $this->hasOne(Shop::class); // One-to-one relationship between User and Shop
+    }
 
 
 

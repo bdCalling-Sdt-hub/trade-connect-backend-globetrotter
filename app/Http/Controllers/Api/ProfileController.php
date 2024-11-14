@@ -116,7 +116,9 @@ class ProfileController extends Controller
                     'full_name'=> $newsFeed->user->full_name ?? '',
                     'user_name'=> $newsFeed->user->user_name ?? '',
                     'email'=> $newsFeed->user->email ?? '',
-                    'image'=> $newsFeed->user->image ? url('Profile/',$newsFeed->user->image) : '',
+                    'image'=> $newsFeed->user->image
+                        ? url('profile/',$newsFeed->user->image)
+                        : url('avatar/profile.png'),
                     ],
                 'like_count'    => $newsFeed->likes->count(),
                 'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
@@ -126,7 +128,7 @@ class ProfileController extends Controller
                         'id'            => $comment->id,
                         'full_name'     => $comment->user->full_name,
                         'user_name'     => $comment->user->user_name,
-                        'image'         => $comment->user->image ? url('Profile/',$comment->user->image) :'',
+                        'image'         => $comment->user->image ? url('profile/',$comment->user->image) :url('avatar/profile.png'),
                         'comment'       => $comment->comments,
                         'created_at'    => $this->getTimePassed($comment->created_at),
                         'reply_count'   => $comment->replies->count(),
@@ -136,7 +138,7 @@ class ProfileController extends Controller
                                 'comment'    => $reply->comments,
                                 'full_name'  => $reply->user->full_name,
                                 'user_name'  => $reply->user->user_name,
-                                'image'      => $reply->user->image ? url('Profile/',$reply->user->image) : '',
+                                'image'      => $reply->user->image ? url('profile/',$reply->user->image) : url('avatar/profile.png'),
                                 'created_at' => $this->getTimePassed($reply->created_at),
                             ];
                         })
@@ -159,14 +161,14 @@ class ProfileController extends Controller
                 'category_name'=> $product->category->category_name,
                 'price'       => $product->price,
                 'product_images'      => collect(json_decode($product->images))->map(function ($image) {
-                                    return $image ? url('products/', $image) : '';
+                                    return $image ? url('products/', $image) : url('avatar/product.png');
 
                                 }),
                 'description' => $product->description,
                 'shop_name'   => $product->shop->shop_name,
                 'seller_name' => $product->shop->user->full_name,
                 'seller_user_name' => $product->shop->user->user_name,
-                'seller_image' => $product->shop->user->image ? url('Profile/', $product->shop->user->image) : '',
+                'seller_image' => $product->shop->user->image ? url('profile/', $product->shop->user->image) : url('avatar/profile.png'),
                 'created_at'  => $product->created_at->format('Y-m-d H:i:s'),
             ];
         });
@@ -177,7 +179,7 @@ class ProfileController extends Controller
             'bio'           => $user->bio,
             'privacy'       => $user->privacy,
             'email'         => $user->email,
-            'image'         => $user->image ? url('Profile/',$user->image) : '',
+            'image'         => $user->image ? url('profile/',$user->image) : url('avatar/profile.png'),
             'friends_count' => $friendsCount,
             'news_feeds'    => $formattedNewsFeeds ?? '',
             'shop'          => $shop ?? '',

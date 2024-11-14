@@ -24,30 +24,18 @@ class GroupController extends Controller
             'user_id' => 'required|exists:users,id',
             'group_id' => 'required|exists:groups,id'
         ]);
-
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 400);
         }
         $joinRequest = JoinRequest::find($id);
-
         if (!$joinRequest) {
             return $this->sendError('Join request not found.', [], 404);
         }
         if ($joinRequest->group_id !== $request->group_id) {
             return $this->sendError('Unauthorized action.', [], 403);
         }
-
-        // Find the group and attach the user as a member
-        // $group = Group::find($joinRequest->group_id);
-        // $group->members()->attach($joinRequest->user_id);
-
-        // $user = User::find($joinRequest->user_id);
-        // $user->notify(new JoinRequestAcceptedNotification($group->name, $user->name));
-        // $joinRequest->delete();
-
         return $this->sendResponse([], 'Join request accepted successfully.');
     }
-
     public function joinGroupRequest(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -62,16 +50,6 @@ class GroupController extends Controller
         if (JoinRequest::where('user_id', $userId)->where('group_id', $groupId)->exists()) {
             return $this->sendError('You have already requested to join this group.', [], 400);
         }
-        // $joinRequest = JoinRequest::create([
-        //     'user_id' => $userId,
-        //     'group_id' => $groupId,
-        // ]);
-        // $groupOwner = Group::find($groupId);
-        // $OnwerEmail = $groupOwner->createdBy->email;
-
-        // $OnwerEmail->notify( new JoinRequestNotification($joinRequest));
-
-        // return $this->sendResponse([], 'Your request to join the group has been submitted successfully.');
     }
     public function otherGroup(Request $request)
     {
@@ -90,7 +68,7 @@ class GroupController extends Controller
                     'full_name' => $group->createdBy->full_name,
                     'user_name' => $group->createdBy->user_name,
                     'email' => $group->createdBy->email,
-                    'image' => $group->createdBy->image ? url('Profile/' . $group->createdBy->image) : url('avatar/profile.png'),
+                    'image' => $group->createdBy->image ? url('profile/' . $group->createdBy->image) : url('avatar/profile.png'),
                 ],
                 'member_count' => $group->members->count(),
             ];
@@ -135,10 +113,8 @@ class GroupController extends Controller
         if ($groups->isEmpty()) {
             return $this->sendResponse([], 'No groups found matching your search criteria.');
         }
-
         return $this->sendResponse($groups, 'Groups retrieved successfully.');
     }
-
     public function peopleSearch(Request $request)
     {
         $request->validate([

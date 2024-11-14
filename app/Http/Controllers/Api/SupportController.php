@@ -13,7 +13,7 @@ class SupportController extends Controller
     public function support(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'message' => 'required|string|min:10',
+            'message' => 'required|string|max:200',
         ]);
         if ($validator->fails()) {
             return $this->sendError("Validation Error", $validator->errors(), 422);
@@ -26,7 +26,7 @@ class SupportController extends Controller
 
             Mail::to($userEmail)->queue(new SupportMail("Your support request has been received. We will get back to you soon.", 'support@gmail.com'));
 
-            return $this->sendResponse(null, 'Support request submitted and email queued successfully!');
+            return $this->sendResponse([], 'Support request submitted and email queued successfully!');
 
         }catch(\Exception $e){
             return $this->sendError('Errors', $e->getMessage(),) ;

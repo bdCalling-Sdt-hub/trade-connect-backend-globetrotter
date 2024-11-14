@@ -21,13 +21,12 @@ class CommentController extends Controller
             return $this->sendError('Newsfeed not found.', [], 404);
         }
         $comments = Comment::where('newsfeed_id', $newsfeedId)
-                            ->with(['user', 'replies.user']) // Load user and reply relationships
+                            ->with(['user', 'replies.user'])
                             ->orderBy('created_at', 'asc')
                             ->get();
         if ($comments->isEmpty()) {
             return $this->sendError([], 'No comments found for this newsfeed.');
         }
-        // Format and return the comments
         $formattedComments = $comments->map(function ($comment) {
             return [
                 'id' => $comment->id,
@@ -54,7 +53,6 @@ class CommentController extends Controller
                 }),
             ];
         });
-
         return $this->sendResponse($formattedComments, 'Comments retrieved successfully.');
     }
     public function store(Request $request)

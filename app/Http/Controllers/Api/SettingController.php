@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -13,16 +14,15 @@ class SettingController extends Controller
 {
     public function getPersonalInformation()
     {
-        $user = JWTAuth::parseToken()->authenticate();
+        $user = Auth::user();
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);
         }
-        $imageUrl = $user->image ? url('Profile/' . $user->image) : null;
         $profileData = [
             'full_name' => $user->full_name,
             'bio'=> $user->bio ?? '',
             'location' => $user->location,
-            'image' => $imageUrl,
+            'image' => /* $user->image ? url('profile/',$user->image) : */ url('avatar/profile.png')
         ];
 
         return response()->json([
@@ -40,8 +40,8 @@ class SettingController extends Controller
             return $this->sendError('User not found!', [], 404);
         }
         $validator = Validator::make($request->all(), [
-            'full_name' => 'string|max:255',
-            'image' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'full_name' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
             'old_password' => 'required|string',
             'new_password' => 'required|string|min:8',
             'confirm_password' => 'required|min:8|same:new_password',

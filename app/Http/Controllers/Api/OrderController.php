@@ -9,6 +9,7 @@ use App\Notifications\OrderAcceptedNotification;
 use App\Notifications\OrderCanceledNotification;
 use App\Notifications\OrderDeliveryRequestNotification;
 use App\Notifications\OrderNotification;
+use App\Notifications\OrderRejectedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -177,13 +178,17 @@ class OrderController extends Controller
         if (!$order) {
             return $this->sendError('Order not found.', [], 404);
         }
+        if($order->status == 'deliveryRequest')
+        {
+            return $this->sendResponse([], 'Delivery request already initiated.');
+        }
         if ($order->status !== 'accepted') {
             return $this->sendError('Delivery request can only be made for accepted orders.', [], 400);
         }
         $order->status = 'deliveryRequest';
         $order->save();
         $order->user->notify(new OrderDeliveryRequestNotification($order));
-        return $this->sendResponse($order, 'Delivery request initiated successfully.');
+        return $this->sendResponse([], 'Delivery request initiated successfully.');
     }
     public function acceptDelivery(Request $request)
     {
@@ -202,18 +207,119 @@ class OrderController extends Controller
         }
         $order->status = 'acceptDelivery';
         $order->save();
-
         $product = $order->product;
         $productOwner = $product->user;
-        $productOwner->increment('balance', $order->total_amount);
-
-         $wallet = Wallet::create([
+        $productOwner->increment('balance', $productOwner->price);
+         Wallet::create([
             "user_id" => $order->user_id,
             "amount" => $order->total_amount,
-            "total_love" => $order->total_amount * 0.95,  // 5% deduction
+            "total_love" => $productOwner->price,
             "payment_method" => $request->payment_method ?? 'manual',
             "status" => "buy"
         ]);
         return $this->sendResponse($order, 'Delivery accepted successfully.');
+    }
+    public function rejectDelivery(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|exists:orders,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 422);
+        }
+        $order = Order::find($request->order_id);
+        if (!$order) {
+            return response()->json(['message' => 'Order not found.'], 404);
+        }
+        if ($order->status == 'rejectDelivery') {
+            return response()->json(['message' => 'This order has already been rejected.'], 200);
+        }
+        if ($order->status !== 'deliveryRequest') {
+            return response()->json(['message' => 'Only orders with a delivery request can be rejected.'], 400);
+        }
+        $order->status = 'rejectDelivery';
+        $order->save();
+        $order->product->user->notify(new OrderRejectedNotification($order));
+        return response()->json(['message' => 'Order delivery rejected successfully.'], 200);
+    }
+    public function rejectedDelivery(Request $request)
+    {
+        $rejectedOrders = Order::where('status', 'rejectDelivery')->paginate(10);
+        if ($rejectedOrders->isEmpty()) {
+            return response()->json([
+                'data' => [],
+                'message' => 'No rejected deliveries found.',
+                'status' => 404
+            ]);
+        }
+        $rejectedOrdersData = $rejectedOrders->map(function($order) {
+            return [
+                'order_id' => $order->id,
+                'user_id' => $order->user_id,
+                'product_id' => $order->product_id,
+                'total_amount' => $order->total_amount,
+                'phone_number' => $order->phone_number,
+                'country' => $order->country,
+                'state' => $order->state,
+                'zipcode' => $order->zipcode,
+                'address' => $order->address,
+                'notes' => $order->notes,
+                'status' => $order->status,
+                'created_at' => $order->created_at->toIso8601String(),
+                'updated_at' => $order->updated_at->toIso8601String(),
+                'user' => [
+                    'id' => $order->user->id,
+                    'full_name' => $order->user->full_name,
+                    'user_name' => $order->user->user_name,
+                    'email' => $order->user->email,
+                    'balance' => $order->user->balance,
+                    'image' => $order->user->image ? url('profile/' . $order->user->image) : url('avatar/profile.png'),
+                ],
+                'product' => [
+                    'id' => $order->product->id,
+                    'product_name' => $order->product->product_name,
+                    'price' => $order->product->price,
+                    'description' => $order->product->description,
+                ]
+            ];
+        });
+
+        return response()->json([
+            'data' => $rejectedOrdersData,
+            'pagination' => [
+                'current_page' => $rejectedOrders->currentPage(),
+                'total_items' => $rejectedOrders->total(),
+                'per_page' => $rejectedOrders->perPage(),
+                'total_pages' => $rejectedOrders->lastPage(),
+            ],
+            'message' => 'Rejected deliveries retrieved successfully.',
+            'status' => 200
+        ]);
+    }
+    public function returnAmount(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|exists:orders,id',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 400);
+        }
+        $order = Order::find($request->order_id);
+        if (!$order) {
+            return $this->sendError('Order not found.');
+        }
+        if($order->status == 'amountReturned')
+        {
+            return $this->sendResponse([], 'Amount already returned to the user.');
+        }
+        $user = $order->user;
+        if ($user->balance >= 0) {
+            $user->balance= $order->total_amount;
+        } else {
+            return $this->sendError('User does not have a balance record.');
+        }
+        $order->status = 'amountReturned';
+        $order->save();
+        return $this->sendResponse([], 'Amount has been successfully returned to the user.');
     }
 }

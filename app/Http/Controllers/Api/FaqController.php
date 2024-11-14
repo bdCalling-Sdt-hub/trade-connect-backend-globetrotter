@@ -11,13 +11,12 @@ class FaqController extends Controller
 {
     public function index()
     {
-        $faqs = Faq::where('status', true)->get();
+        $faqs = Faq::where('status', true)->paginate(10);
         if(!$faqs){
             return $this->sendError('FAQ not found!', [], 404);
         }
         return $this->sendResponse($faqs, 'FAQs retrieved successfully.');
     }
-
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -32,7 +31,6 @@ class FaqController extends Controller
         $faq = Faq::create($request->all());
         return $this->sendResponse($faq, 'FAQ created successfully.');
     }
-
     public function show($id)
     {
         $faq = Faq::find($id);
@@ -41,28 +39,23 @@ class FaqController extends Controller
         }
         return $this->sendResponse($faq, 'FAQ retrieved successfully.');
     }
-
     public function update(Request $request, $id)
     {
         $faq = Faq::find($id);
         if (!$faq) {
             return $this->sendError('FAQ not found.', [], 404);
         }
-
         $validator = Validator::make($request->all(), [
             'question' => 'sometimes|required|string|max:255',
             'answer' => 'sometimes|required|string',
             'status' => 'sometimes|required|boolean',
         ]);
-
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 400);
         }
-
         $faq->update($request->all());
         return $this->sendResponse($faq, 'FAQ updated successfully.');
     }
-
     public function destroy($id)
     {
         $faq = FAQ::find($id);

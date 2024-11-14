@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\User;
+use App\Notifications\BalanceUpdated;
 use App\Rules\Lowercase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,9 +22,99 @@ use PHPOpenSourceSaver\JWTAuth\Exceptions\JWTException;
 use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenExpiredException;
 use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenInvalidException;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-
+use Illuminate\Support\Str;
 class AuthController extends Controller
 {
+    public function socialLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'full_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'google_id' => 'string|nullable',
+            'facebook_id' => 'string|nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 400);
+        }
+        $existingUser = User::where('email', $request->email)->first();
+        if ($existingUser) {
+            $socialMatch = ($request->has('google_id') && $existingUser->google_id === $request->google_id) ||
+                           ($request->has('facebook_id') && $existingUser->facebook_id === $request->facebook_id);
+            if ($socialMatch) {
+                $token = JWTAuth::fromUser($existingUser);
+                return $this->responseWithToken($token);
+            } elseif (is_null($existingUser->google_id) && is_null($existingUser->facebook_id)) {
+                return response()->json(['message' => 'User already exists. Sign in manually.'], 422);
+            } else {
+                $existingUser->update([
+                    'google_id' => $request->google_id ?? $existingUser->google_id,
+                    'facebook_id' => $request->facebook_id ?? $existingUser->facebook_id,
+                ]);
+                $token = JWTAuth::fromUser($existingUser);
+                return $this->responseWithToken($token);
+            }
+        }
+        $user = User::create([
+            'full_name' => $request->full_name,
+            'user_name' => Str::lower($request->full_name),
+            'email' => $request->email,
+            'password' => Hash::make(Str::random(16)),
+            'role' => 'MEMBER',
+            'google_id' => $request->google_id ?? null,
+            'facebook_id' => $request->facebook_id ?? null,
+            'verify_email' => false,
+            'status' => 'active',
+        ]);
+        $token = JWTAuth::fromUser($user);
+        return $this->responseWithToken($token);
+    }
+    public function generateUniqueUserName($fullName)
+    {
+        $baseUserName = Str::lower($fullName);
+        $userName = $baseUserName;
+        while (User::where('user_name', $userName)->exists()) {
+            $randomNumber = rand(1000, 9999);
+            $userName = $baseUserName . $randomNumber;
+        }
+        return $userName;
+    }
+
+    protected function responseWithToken($token)
+    {
+        return $this->sendResponse($token, 'User logged in successfully.');
+    }
+    public function increaseBalance(Request $request, $id)
+    {
+        $request->validate(['amount' => 'required|numeric|min:0.01']);
+        $user = User::findOrFail($id);
+        $user->balance += $request->input('amount');
+        $user->save();
+        $amount = $request->amount;
+        $user->notify(new BalanceUpdated($amount, 'increase'));
+        return response()->json([
+            'message' => 'Balance increased successfully.',
+            'balance' => $user->balance
+        ]);
+    }
+    public function decreaseBalance(Request $request, $id)
+    {
+        $request->validate(['amount' => 'required|numeric|min:0.01']);
+        $user = User::findOrFail($id);
+        if ($user->balance < $request->input('amount')) {
+            return response()->json([
+                'message' => 'Insufficient balance.',
+            ], 400);
+        }
+        $user->balance -= $request->input('amount');
+        $user->save();
+        $amount = $request->amount;
+        $user->notify(new BalanceUpdated($amount, 'decrease'));
+        return response()->json([
+            'message' => 'Balance decreased successfully.',
+            'balance' => $user->balance
+        ]);
+    }
     public function getUserName(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -74,8 +165,6 @@ class AuthController extends Controller
             return response()->json(['token_status' => false, 'error' => 'An unexpected error occurred.'], 500);
         }
     }
-
-
     public function register(Request $request)
     {
         $user = User::where('email', $request->email)->where('verify_email', 0)->first();
@@ -98,7 +187,6 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json(['error' => 'Validation Error.', 'messages' => $validator->errors()], 422);
         }
-
         $user = $this->createUser($request);
         $this->sendOtpEmail($user);
 
@@ -160,7 +248,6 @@ class AuthController extends Controller
         if (now()->greaterThan($user->otp_expires_at)) {
             return response()->json(['error' => 'OTP has expired. Please request a new one.'], 401);
         }
-
         $user->update([
             'verify_email' => 1,
             'otp' => null,
@@ -174,8 +261,6 @@ class AuthController extends Controller
         } catch (JWTException $e) {
             return response()->json(['error' => 'Could not create token.'], 500);
         }
-
-        // Return success response with token
         return response()->json([
             'status' => 200,
             'message' => 'Email verified successfully.',
@@ -193,9 +278,7 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
-
         $credentials = $request->only('email', 'password');
-
         try {
             if (!$token = JWTAuth::attempt($credentials)) {
                 return response()->json(['error' => 'Invalid credentials'], 401);
@@ -260,7 +343,6 @@ class AuthController extends Controller
             return response()->json(['status'=>200,'message' => 'Password reset successfully','data'=> $user], 200);
         }
     }
-
     public function updatePassword(Request $request)
     {
         $user = Auth::user();
@@ -299,13 +381,12 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'location' => $user->location,
                 'address' => $user->address,
-                'image' => $user->image ? url('Profile/' . $user->image) : null,
+                'image' => $user->image ? url('profile/' . $user->image) : url('avatar/profile.png'),
             ];
         });
 
         return response()->json(['status' => 200, 'users' => $formattedUsers], 200);
     }
-
     public function resendOtp(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -345,7 +426,6 @@ class AuthController extends Controller
             'data' => $profileData,
         ], 200);
     }
-    //profile update
     public function profile(Request $request)
     {
         $user = Auth::user();
@@ -354,7 +434,7 @@ class AuthController extends Controller
         }
         $validator = Validator::make($request->all(), [
             'full_name' => 'nullable|required|string|max:255',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
             'location' => 'nullable|required|string|max:255',
             'bio' => 'nullable|required|string|max:255',
         ]);
@@ -362,7 +442,6 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
-
         if ($request->hasFile('image')) {
             if ($user->image) {
                 $oldImagePath = public_path('profile/' . $user->image);
@@ -370,7 +449,6 @@ class AuthController extends Controller
                     unlink($oldImagePath);
                 }
             }
-
             $image = $request->file('image');
             $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
             $image->move(public_path('profile'), $fileName);
@@ -407,14 +485,11 @@ class AuthController extends Controller
             'expires_in' => auth()->factory()->getTTL() * 60
         ];
     }
-
-
     /*
     ----------------------------------------
                Admin Dashboard
     ----------------------------------------
     */
-
     public function updateRole(Request $request, $id)
     {
         try {
@@ -438,54 +513,17 @@ class AuthController extends Controller
             return response()->json(['message' => 'Error updating user role', 'error' => $e->getMessage()], 500);
         }
     }
-    public function deleteUser($id)
+    public function userList(Request $request)
     {
         try {
-            $user = User::find($id);
-            if (!$user) {
-                return response()->json(['message' => 'User not found.'], 404);
-            }
-            $user->delete();
-            return response()->json(['message' => 'User deleted successfully.']);
-
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Error deleting user', 'error' => $e->getMessage()], 500);
-        }
-    }
-    public function searchUser(Request $request)
-    {
-        try {
-            $request->validate([
-                'query' => 'required|string|min:1',
-            ]);
             $query = $request->input('query');
-            $users = User::where('full_name', 'LIKE', "%{$query}%")
+            $users = User::where('status','active')
+                ->whereIn('role',['ADMIN','MEMBER'])
+                ->where('full_name', 'LIKE', "%{$query}%")
                 ->orWhere('email', 'LIKE', "%{$query}%")
                 ->orderBy('id', 'DESC')
-                ->get();
-            $formattedUsers = $users->map(function ($user) {
-                return [
-                    'id' => $user->id,
-                    'full_name' => $user->full_name,
-                    'user_name' => $user->user_name,
-                    'email' => $user->email,
-                    'image' => $user->image ? url('profile/',$user->image) : url('avatar/profile.png'),
-                    'role' => $user->role,
-                    'status' => $user->status,
-                ];
-            });
-            return $this->sendResponse($formattedUsers, 'User search results retrieved successfully.');
+                ->paginate(10);
 
-        } catch (\Exception $e) {
-            return $this->sendError('Error searching users', ['error' => $e->getMessage()], 500);
-        }
-    }
-    public function userList()
-    {
-        try {
-            $users = User::where('status','active')
-            ->whereIn('role',['ADMIN','MEMBER'])
-            ->orderBy('id', 'DESC')->paginate(10);
             $formattedUsers = $users->map(function ($user) {
                 return [
                     'id' => $user->id,
@@ -505,7 +543,6 @@ class AuthController extends Controller
     }
     public function userDetails(Request $request)
     {
-
         $userId = $request->user_id;
         $user = User::find($userId);
         if(!$user)
@@ -513,82 +550,20 @@ class AuthController extends Controller
             $this->sendError("No user found.");
         }
         $shop = Shop::where('user_id', $userId)->first();
-        if (!$shop) {
-            return $this->sendError('Shop not found for the user.', [], 404);
-        }
-        $products = Product::where('shop_id', $shop->id)->get();
-        if ($products->isEmpty()) {
-            return $this->sendError('No products found for the user.', [], 404);
-        }
+        $products = Product::where('user_id', $user->id)->get();
         $productIds = $products->pluck('id')->toArray();
-        // Get counts
         $approvedProduct = $products->where('status','approved')->count();
         $pendingProduct = $products->where('status','pending')->count();
         $canceledProduct = $products->where('status','canceled')->count();
-
         $saleOrders = Order::whereIn('product_id', $productIds)
                             ->where('status', 'acceptDelivery')
+                            ->count();
+        $purchageOrders = Order::whereIn('product_id', $productIds)
+                            ->where('status', 'accepted')
                             ->count();
         $pendingOrders = Order::whereIn('product_id', $productIds)
                             ->where('status', 'pending')
                             ->count();
-        // Initialize activity arrays
-        $dailySalesActivity = [];
-        $dailyPurchasesActivity = [];
-        $weeklySalesActivity = [];
-        $weeklyPurchasesActivity = [];
-        $monthlySalesActivity = [];
-        $monthlyPurchasesActivity = [];
-        // Daily Activity Loop
-        for ($i = 0; $i < 30; $i++) {
-            $date = now()->subDays($i)->toDateString();
-            $salesCount = Order::whereIn('product_id', $productIds)
-                                ->where('status', 'acceptDelivery')
-                                ->whereDate('created_at', $date)
-                                ->count();
-            $purchasesCount = Order::whereIn('product_id', $productIds)
-                                    ->where('status', 'pending')
-                                    ->whereDate('created_at', $date)
-                                    ->count();
-
-            $dailySalesActivity[] = ['date' => $date, 'count' => $salesCount];
-            $dailyPurchasesActivity[] = ['date' => $date, 'count' => $purchasesCount];
-        }
-        // Weekly Activity Loop
-        for ($i = 0; $i < 4; $i++) {
-            $startOfWeek = now()->subWeeks($i)->startOfWeek()->toDateString();
-            $endOfWeek = now()->subWeeks($i)->endOfWeek()->toDateString();
-
-            $weeklySalesCount = Order::whereIn('product_id', $productIds)
-                                    ->where('status', 'acceptDelivery')
-                                    ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
-                                    ->count();
-            $weeklyPurchasesCount = Order::whereIn('product_id', $productIds)
-                                        ->where('status', 'pending')
-                                        ->whereBetween('created_at', [$startOfWeek, $endOfWeek])
-                                        ->count();
-
-            $weeklySalesActivity[] = ['week' => "Week " . ($i + 1), 'count' => $weeklySalesCount];
-            $weeklyPurchasesActivity[] = ['week' => "Week " . ($i + 1), 'count' => $weeklyPurchasesCount];
-        }
-        // Monthly Activity Loop
-        for ($i = 0; $i < 12; $i++) {
-            $month = now()->subMonths($i)->format('Y-m');
-            $monthlySalesCount = Order::whereIn('product_id', $productIds)
-                                    ->where('status', 'acceptDelivery')
-                                    ->whereMonth('created_at', now()->subMonths($i)->month)
-                                    ->whereYear('created_at', now()->subMonths($i)->year)
-                                    ->count();
-            $monthlyPurchasesCount = Order::whereIn('product_id', $productIds)
-                                        ->where('status', 'pending')
-                                        ->whereMonth('created_at', now()->subMonths($i)->month)
-                                        ->whereYear('created_at', now()->subMonths($i)->year)
-                                        ->count();
-
-            $monthlySalesActivity[] = ['month' => $month, 'count' => $monthlySalesCount];
-            $monthlyPurchasesActivity[] = ['month' => $month, 'count' => $monthlyPurchasesCount];
-        }
-        // Prepare Response Data
         $response = [
             'user' => [
                 'id' => $user->id,
@@ -598,27 +573,24 @@ class AuthController extends Controller
                 'balance' => $user->balance,
                 'image' => $user->image ? url('profile/', $user->image) : url('avatar/profile.png'),
             ],
-            'shop' => [
-                'name' => $shop->shop_name,
-                'seller_name' => $shop->user->full_name,
-                'user_name' => $shop->user->user_name,
+            'shop' => $shop ?
+            [
+                'name' => $shop->shop_name ?? 'N/A' ,
+                'logo'=>$shop->logo ? url('logos/', $shop->logo) : url('avatar/logo.png'),
+                'seller_name' => $shop->user->full_name ??'N/A',
+                'user_name' => $shop->user->user_name ?? 'N/A',
                 'image' => $shop->user->image ? url('profile/', $shop->user->image) : url('avatar/profile.png'),
-            ],
+            ]
+            : [],
             'counts' => [
                 'approvedProduct' => $approvedProduct,
                 'pendingProduct' => $pendingProduct,
                 'canceledProduct' => $canceledProduct,
-                'saleOrders' => $saleOrders,
                 'pendingOrders' => $pendingOrders,
+                'saleOrders' => $saleOrders,
+                'purchageOrders' => $purchageOrders,
             ],
-            'activities' => [
-                'dailySales' => $dailySalesActivity,
-                'dailyPurchases' => $dailyPurchasesActivity,
-                'weeklySales' => $weeklySalesActivity,
-                'weeklyPurchases' => $weeklyPurchasesActivity,
-                'monthlySales' => $monthlySalesActivity,
-                'monthlyPurchases' => $monthlyPurchasesActivity,
-            ],
+            'activities'=> $this->getCurrentYearOrderActivities(),
             'products' => $products->map(function ($product) {
                 return [
                     'id' => $product->id,
@@ -635,4 +607,27 @@ class AuthController extends Controller
         ];
         return $this->sendResponse($response, 'User products retrieved successfully.');
     }
+    private function getCurrentYearOrderActivities()
+    {
+        $currentYear = now()->year;
+        $productIds = Product::pluck('id')->toArray();
+        $totalPurchaseOrders = Order::whereIn('product_id', $productIds)
+                                     ->where('status', 'accepted')
+                                     ->whereYear('created_at', $currentYear)
+                                     ->count();
+        $totalSalesOrders = Order::whereIn('product_id', $productIds)
+                                 ->where('status', 'acceptDelivery')
+                                 ->whereYear('created_at', $currentYear)
+                                 ->count();
+        return  [
+            'purchaseOrders' => [
+                'total' => $totalPurchaseOrders,
+            ],
+            'salesOrders' => [
+                'total' => $totalSalesOrders,
+            ],
+            'year' => $currentYear,
+        ];
+    }
+
 }

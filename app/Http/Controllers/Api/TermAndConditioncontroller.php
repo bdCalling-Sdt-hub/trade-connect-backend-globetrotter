@@ -17,7 +17,6 @@ class TermAndConditioncontroller extends Controller
         }
         return $this->sendResponse($termAndCondition, 'Term and condition retrieved successfully.');
     }
-
     public function update(Request $request, $id)
     {
         $terms = TermAndCondition::find($id);

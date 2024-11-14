@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Product;
 use App\Models\RequestLove;
 use App\Models\User;
 use App\Models\Wallet;
@@ -254,10 +256,10 @@ class WalletController extends Controller
             ]
         ], "Transaction history retrieved successfully.");
     }
-    public function transitions()
+    public function transitions(Request $request)
     {
         try {
-            $wallets = Wallet::orderBy('id', 'desc')->get();
+            $wallets = Wallet::orderBy('id', 'desc')->paginate(10);
             if ($wallets->isEmpty()) {
                 return $this->sendError([], "No wallet transactions found.");
             }
@@ -309,7 +311,7 @@ class WalletController extends Controller
                     'total_transactions' => $totalTransactions,
                     'revenue' => $revenue,
                     'total_revenue' => $totalRevenue,
-                ]
+                ],
             ];
             return $this->sendResponse($response, 'Wallet transactions and statistics retrieved successfully.');
         } catch (Exception $e) {

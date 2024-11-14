@@ -104,7 +104,6 @@ class FriendController extends Controller
             ->paginate($perPage)
             ->through(function ($friend) use ($user_id) {
                 $friendData = $friend->user_id == $user_id ? $friend->friend : $friend->user;
-
                 return [
                     'id'          => $friend->id,
                     'full_name'   => $friendData->full_name,
@@ -124,6 +123,4 @@ class FriendController extends Controller
             'friends' => $friends
         ]);
     }
-
-
 }

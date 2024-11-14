@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('zipcode')->nullable();
             $table->string('address')->nullable();
             $table->text('notes')->nullable();
-            $table->enum('status', ['pending','canceled','accepted','deliveryRequest','acceptDelivery'])->default('pending');
+            $table->enum('status', ['pending','canceled','accepted','deliveryRequest','acceptDelivery','rejectDelivery','amountReturned'])->default('pending');
             $table->timestamps();
         });
     }

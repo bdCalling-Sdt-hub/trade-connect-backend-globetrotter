@@ -117,7 +117,7 @@ class NewsFeedController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:10240',
             'privacy'  => 'required|in:public,private,friends',
             'share_your_thoughts' => 'required|string',
         ]);
@@ -153,7 +153,7 @@ class NewsFeedController extends Controller
         }
         $validator = Validator::make($request->all(), [
             'share_your_thoughts' => 'nullable|string',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:10240',
             'privacy' => 'nullable|in:public,private,friends',
         ]);
 

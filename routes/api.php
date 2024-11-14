@@ -1,6 +1,7 @@
 
 <?php
 
+use App\Http\Controllers\Api\AboutController;
 use App\Http\Controllers\Api\FaqController;
 use App\Http\Controllers\Api\FriendController;
 use App\Http\Controllers\Api\LikeController;
@@ -37,8 +38,7 @@ Route::group(['middleware' => ['api'],'controller' => AuthController::class], fu
     Route::post('/resetPassword', 'resetPassword')->withoutMiddleware('jwt.auth');
     Route::post('/resendOtp', 'resendOtp')->withoutMiddleware('jwt.auth');
     Route::get('/get-user-name', 'getUserName')->withoutMiddleware('jwt.auth');
-    // Route::post('/loginWithGoogle', 'loginWithGoogle')->withoutMiddleware('jwt.auth');
-    // Route::post('/loginWithFacebook', 'loginWithFacebook')->withoutMiddleware('jwt.auth');
+    Route::post('social-login', 'socialLogin')->withoutMiddleware(['jwt.auth','member']);
     Route::post('/logout', 'logout')->middleware(['jwt.auth','member']);
     Route::get('/user', 'user')->middleware(['jwt.auth','member']);
     Route::post('/updatePassword', 'updatePassword')->middleware(['jwt.auth','member']);
@@ -128,7 +128,7 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::post('/support', [SupportController::class, 'support']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
-    Route::get('/notifications', [NotificationController::class, 'getAllNotifications']);
+    Route::get('/notifications', [NotificationController::class, 'notifications']);
     Route::get('/notifications/unread', [NotificationController::class, 'getUnreadNotifications']);
     Route::post('/notifications/read/{id}', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
@@ -145,6 +145,7 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::get('get-user-order', [OrderController::class, 'getUserOrder']);
     Route::put('cancel-order', [OrderController::class, 'cancelOrder']);
     Route::put('accept-delivery', [OrderController::class, 'acceptDelivery']);
+    Route::put('reject-delivery', [OrderController::class, 'rejectDelivery']);
 
     Route::get('get-seller-order', [OrderController::class, 'getSellerOrder']);
     Route::put('accept-order', [OrderController::class, 'acceptOrder']);
@@ -180,7 +181,9 @@ Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
     Route::get('searchUser', [AuthController::class, 'searchUser']);
     Route::get('user-details', [AuthController::class, 'userDetails']);
     Route::put('update-role/{id}', [AuthController::class, 'updateRole']);
-    Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
+    // Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
+    Route::put('increase-balance/{userId}', [AuthController::class, 'increaseBalance']);
+    Route::put('decrease-balance/{userId}', [AuthController::class, 'decreaseBalance']);
 });
 Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
     Route::apiResource('love', LoveController::class);
@@ -202,4 +205,12 @@ Route::middleware(['api', 'jwt.auth','member'])->group(function () {
 });
 Route::middleware(['api', 'jwt.auth', 'admin'])->group(function () {
     Route::get('transitions', [WalletController::class, 'transitions']);
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('about-us', [AboutController::class, 'aboutUs'])->middleware('member');
+    Route::post('about', [AboutController::class, 'about'])->middleware('admin');
+});
+Route::middleware(['api', 'jwt.auth'])->group(function () {
+    Route::get('rejected-delivery', [OrderController::class, 'rejectedDelivery'])->middleware('admin');
+    Route::put('return-amount', [OrderController::class, 'returnAmount'])->middleware('admin');
 });
