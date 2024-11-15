@@ -14,6 +14,7 @@ class GroupMessage extends Model
         'message',
         'images',
         'is_read',
+        'read_by'
     ];
 
     public function sender()
@@ -27,6 +28,8 @@ class GroupMessage extends Model
     }
 
     protected $casts = [
-        'images' => 'array', // Automatically cast images to an array
+        'images' => 'array',
+        'read_by' => 'array', 
     ];
+
 }

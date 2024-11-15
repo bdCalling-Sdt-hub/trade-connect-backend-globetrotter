@@ -1,174 +1,77 @@
 import express from 'express';
-import http from 'http';
+import { createServer } from 'http';
 import { Server } from 'socket.io';
 
 const app = express();
-const server = http.createServer(app);
+const server = createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
+    cors: {
+        origin: '*',
+    },
 });
 
-app.use(express.json());
-let userStatus = {};
-let activeUsersInChat = new Set();
-let postLikes = {};
-let totalLikes = 0;
-let comments = {};
+const users = {};
+
+// const groups = {};
 
 io.on('connection', (socket) => {
-    console.log('A user connected: ' + socket.id);
-    //Active user
-    socket.on('is_active', (user) => {
-        const { is_active, user_id } = user;
-        // console.log(`User is active in chat: ${is_active}, user ID: ${user_id}`);
-        if (is_active) {
-            userStatus[user_id] = 'active';
-            activeUsersInChat.add(user_id);
-            console.log(`User ${user_id} marked as active. Active users: ${Array.from(activeUsersInChat)}`);
-            io.emit('userStatusUpdate', { user_id, status: 'active' });
+    console.log(`User connected: ${socket.id}`);
+    // Listen for 'login' event and store user with socket ID
+    socket.on('login', ({id}) => {
+        users[id] = socket.id
+        console.log(`User logged in: ${id}`);
+        io.emit("login", socket.id)
+        console.log("users : ",users)
+    });
+
+    // Handle private messages
+    socket.on('message', ({id , message}) => {
+        console.log(`Sending private message to User ${id} to ${message}`);
+        if (users[id]) {
+
+            console.log("users : ",users)
+            io.to(users[id]).emit('message', {
+                senderId: id,
+                message
+            });
+            io.to(socket.id).emit('message', {
+                senderId: id,
+                message
+            });
+            console.log(users[id])
         } else {
-            userStatus[user_id] = 'inactive';
-            activeUsersInChat.delete(user_id);
-            console.log(`User ${user_id} marked as inactive. Active users: ${Array.from(activeUsersInChat)}`);
-            io.emit('userStatusUpdate', { user_id, status: 'inactive' });
+            console.log(`User ${id} not found or offline.`);
         }
-        io.emit('activeUsers', Array.from(activeUsersInChat));
     });
-     // Notification for status changes (approved, canceled, pending)
-     socket.on('statusChange', (data) => {
-        const { userId, status } = data;
-        console.log(`Status change for User ${userId}: ${status}`);
+    // Join a user to a group
+    socket.on('join_group', ({ userId, groupId }) => {
+        socket.join(groupId)
+        // Add user to group
+        console.log(`User ${userId} joined group ${groupId}`);
+        io.to(groupId).emit("join_group", `${userId + "this user is joined group" + groupId}`)
+    });
+    // Handle group messages
+    socket.on('group_message', ({ groupId, senderId, message }) => {
+        socket.join(groupId)
 
-        io.emit('statusNotification', { userId, status });
-    });
-    //newsfeedCreate
-    socket.on('newsfeedCreate', (data) => {
-        const { newsfeedId, userId, content } = data;
-        console.log(`New newsfeed created by User ${userId}: Newsfeed ID = ${newsfeedId}, Content = ${content}`);
+        io.to(groupId).emit('group_message', { senderId, message });
+        console.log(`Message in group ${groupId} from ${senderId}: ${message}`);
 
-        io.emit('newsfeedNotification', { newsfeedId, userId, content });
     });
-    //like
-    socket.on('like', (data) => {
-        const { postId, userId } = data;
-        if (!postLikes[postId]) {
-            postLikes[postId] = new Set();
-        }
-        if (postLikes[postId].has(userId)) {
-            postLikes[postId].delete(userId);
-            totalLikes--;
-            console.log(`User ${userId} unliked post ${postId} , TotalLikes: ${totalLikes}` );
-        } else {
-            postLikes[postId].add(userId);
-            totalLikes++;
-            console.log(`User ${userId} liked post ${postId}, TotalLikes: ${totalLikes}`);
-        }
-        const likeCount = postLikes[postId].size;
-        io.emit('likeUpdate', { postId, likeCount, totalLikes });
-    });
-    //comment
-    socket.on('addComment', (data) => {
-        const { newsfeedId, userId, comment, parentId = null } = data;
-        const newComment = {
-            id: socket.id + Date.now(), // Unique ID for the comment
-            userId,
-            comment,
-            parentId,
-            timestamp: new Date()
-        };
-        if (!comments[newsfeedId]) {
-            comments[newsfeedId] = [];
-        }
-        comments[newsfeedId].push(newComment);
-        console.log("New Comment Added:", newComment);
-        io.emit('commentUpdate', { newsfeedId, comments: comments[newsfeedId] });
-    });
-    //reply
-    socket.on('addReply', (data) => {
-        const { newsfeedId, parentId, userId, reply } = data;
-
-        const newReply = {
-            id: socket.id + Date.now(), // Unique ID for the reply
-            userId,
-            comment: reply,
-            parentId,
-            timestamp: new Date()
-        };
-        if (!comments[newsfeedId]) {
-            comments[newsfeedId] = [];
-        }
-        comments[newsfeedId].push(newReply);
-        console.log("New Reply Added:", newReply);
-        io.emit('commentUpdate', { newsfeedId, comments: comments[newsfeedId] });
-    });
-    //message
-    socket.on('message', (message) => {
-      console.log(`Message : ${message}`);
-      io.emit("message",message)
-  });
-    //join Room
-    socket.on('joinRoom', (room) => {
-        socket.join(room);
-        console.log(`User ${socket.id} joined room: ${room.room}`);
-        socket.to(room).emit('message', `User ${socket.id} has joined the room.`);
-    });
-    //Leave Room
-    socket.on('leaveRoom', (room) => {
-        socket.leave(room);
-        console.log(`User ${socket.id} left room: ${room.room}`);
-        socket.to(room).emit('message', `User ${socket.id} has left the room.`);
-    });
-    //Room Message
-    socket.on('roomMessage', ({ room, message }) => {
-        console.log(`Message to room  ${room}: ${message}`);
-        io.to(room).emit('roomMessage', { user: socket.id, message });
-    });
-    // 1. Sending an offer from one peer to another
-    socket.on('offer', (data) => {
-        const { room, offer } = data;
-        console.log(`Offer sent to room ${room}:${offer.type} ${offer.sdp}`);
-        socket.to(room).emit('offer', offer);
-    });
-
-    // 2. Sending an answer in response to an offer
-    socket.on('answer', (data) => {
-        const { room, answer } = data;
-        console.log(`Answer sent to room ${room}: ${answer.type} ${answer.sdp}`);
-        socket.to(room).emit('answer', answer);
-    });
-
-    // 3. Sending ICE candidates
-    socket.on('ice-candidate', (data) => {
-        const { room, candidate } = data;
-        console.log(`ICE candidate sent to room ${room}: ${candidate.candidate}`);
-        socket.to(room).emit('ice-candidate', candidate);
-    });
-
-    // WebRTC Audio/Video Calls and Room-Based Audio/Video Calls
-    socket.on('roomAudioCall', (room) => {
-        console.log(`Audio call initiated in room: ${room.room}`);
-        io.to(room).emit('roomAudioCall', `Audio call initiated in room: ${room}`);
-    });
-
-    socket.on('roomVideoCall', (room) => {
-        console.log(`Video call initiated in room: ${room.room}`);
-        io.to(room).emit('roomVideoCall', `Video call initiated in room: ${room}`);
-    });
+    // Handle user disconnection and clean up
     socket.on('disconnect', () => {
-        console.log('User disconnected: ' + socket.id);
-//Disconnect user
-        for (const userId of activeUsersInChat) {
-            userStatus[userId] = 'inactive';
-            activeUsersInChat.delete(userId);
-            console.log(`User ${userId} marked as inactive upon disconnection.`);
-            io.emit('userStatusUpdate', { userId, status: 'inactive' });
+        console.log(`User disconnected: ${socket.id}`);
+        for (const [id] of Object.entries(users)) {
+            console.log("des : user id ", id)
+            if (id) {
+                delete users[id];
+                break;
+            }
         }
+        console.log(users)
     });
 });
-server.listen(3000, "192.168.12.160", () => {
-    console.log('Server running at http://192.168.12.160:7000');
+const PORT = 3000;
+server.listen(PORT, () => {
+    console.log(`Socket.IO server running at http://192.168.12.160:${PORT}`);
 });
-

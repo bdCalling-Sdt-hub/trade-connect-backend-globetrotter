@@ -3,6 +3,7 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "start": "nodemon server.js",
         "build": "vite build"
     },
     "devDependencies": {
@@ -12,6 +13,7 @@
     },
     "dependencies": {
         "express": "^4.21.0",
+        "nodemon": "^3.1.7",
         "socket.io": "^4.7.5"
     }
 }

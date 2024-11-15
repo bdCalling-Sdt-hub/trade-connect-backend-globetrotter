@@ -18,6 +18,7 @@ return new class extends Migration
             $table->text('message');
             $table->json('images')->nullable();
             $table->boolean('is_read')->default(false);
+            $table->json('read_by')->nullable();
             $table->timestamps();
         });
     }

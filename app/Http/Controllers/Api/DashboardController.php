@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\Product;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\Request;
@@ -12,58 +14,46 @@ class DashboardController extends Controller
     public function dashboard(Request $request)
     {
         try {
-            $period = $request->query('period', 'weekly'); // Default to 'weekly' if not specified
-            // Initialize date ranges based on period
-            switch ($period) {
-                case 'monthly':
-                    $startDate = now()->startOfMonth();
-                    $endDate = now()->endOfMonth();
-                    break;
-                case 'yearly':
-                    $startDate = now()->startOfYear();
-                    $endDate = now()->endOfYear();
-                    break;
-                case 'weekly':
-                default:
-                    $startDate = now()->startOfWeek();
-                    $endDate = now()->endOfWeek();
-                    break;
-            }
             $activeUsersCount = User::where('status', 'active')->count();
             $totalTransactions = Wallet::count();
             $totalRevenue = Wallet::sum('amount');
-            // Period-specific metrics
-            $filteredUsersCount = User::where('status', 'active')->whereBetween('created_at', [$startDate, $endDate])->count();
-            $filteredRevenue = Wallet::whereBetween('created_at', [$startDate, $endDate])->sum('amount');
-            $filteredTransactions = Wallet::whereBetween('created_at', [$startDate, $endDate])->count();
-            // Full period-based revenue data
-            $weeklyRevenue = Wallet::whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()])->sum('amount');
-            $monthlyRevenue = Wallet::whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->sum('amount');
-            $yearlyRevenue = Wallet::whereBetween('created_at', [now()->startOfYear(), now()->endOfYear()])->sum('amount');
-           
+            $yearlyRevenue = Wallet::whereYear('created_at', now()->year)->sum('amount');
+            $totalProducts = Product::where('status', 'approved')->count();
+            $pendingProducts = Product::where('status', 'pending')->count();
+            $canceledProducts = Product::where('status', 'canceled')->count();
+            $pendingOrders = Order::where('status', 'pending')->count();
+            $monthlyRevenue = [];
+            for ($month = 1; $month <= 12; $month++) {
+                $monthlyRevenue[] = [
+                    'month' => now()->setMonth($month)->format('M'),
+                    'revenue' => Wallet::whereMonth('created_at', $month)
+                                        ->whereYear('created_at', now()->year)
+                                        ->sum('amount') ?? 0,
+                ];
+            }
             $response = [
                 'users' => [
-                    'activeUsersCount' => $activeUsersCount,
-                    'filteredUsersCount' => $filteredUsersCount,
+                    'activeUsersCount' => $activeUsersCount ?? 0,
+                ],
+                'products' => [
+                    'totalProducts' => $totalProducts ?? 0,
+                    'pendingProducts' => $pendingProducts ?? 0,
+                    'canceledProducts' => $canceledProducts ?? 0,
                 ],
                 'revenue' => [
-                    'totalRevenue' => $totalRevenue,
-                    'filteredRevenue' => $filteredRevenue,
-                    'weeklyRevenue' => $weeklyRevenue,
-                    'monthlyRevenue' => $monthlyRevenue,
-                    'yearlyRevenue' => $yearlyRevenue,
+                    'totalRevenue' => $totalRevenue ?? 0,
                 ],
                 'transactions' => [
-                    'totalTransactions' => $totalTransactions,
-                    'filteredTransactions' => $filteredTransactions,
+                    'totalTransactions' => $totalTransactions ?? 0,
+                ],
+                'orders' => [
+                    'pendingOrders' => $pendingOrders ?? 0,
                 ],
                 'activities' => [
-                    $period => [
-                        'userRegistrations' => $filteredUsersCount,
-                        'transactions' => $filteredTransactions,
-                        'revenue' => $filteredRevenue,
-                    ],
-                ]
+                    'yearlyRevenue' => $yearlyRevenue ?? 0,
+                    'monthlyRevenue' => $monthlyRevenue,
+                    'currentYear' => now()->year,
+                ],
             ];
             return $this->sendResponse($response, 'Dashboard data retrieved successfully.');
         } catch (\Exception $e) {
