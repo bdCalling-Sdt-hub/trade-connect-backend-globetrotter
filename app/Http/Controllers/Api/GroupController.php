@@ -316,88 +316,86 @@ class GroupController extends Controller
     }
     public function sendGroupMessage(Request $request)
     {
+        $userId = auth()->user()->id;
         $validator = Validator::make($request->all(), [
             'group_id' => 'required|exists:groups,id',
             'message' => 'required|string',
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'images' => 'nullable|array|max:9',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
         ]);
         if ($validator->fails()) {
-            return $this->sendError('Validation Error', $validator->errors(), 422);
+            return $this->sendError('Validation Error', $validator->errors(), 400);
         }
-        $groupMessage = new GroupMessage();
-        $groupMessage->group_id = $request->group_id;
-        $groupMessage->sender_id = Auth::user()->id;
-        $groupMessage->message = $request->message;
-
+        $imagePaths = [];
         if ($request->has('images')) {
-            $imagePaths = [];
             foreach ($request->images as $image) {
-                $fileName = time() . '.' . $image->getClientOriginalExtension();
-                $image->move(public_path('GroupMessages'), $fileName);
+                $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('GropupMessages/'), $fileName);
                 $imagePaths[] = $fileName;
             }
-            $groupMessage->images = json_encode($imagePaths);
         }
-        $groupMessage->save();
-        $formattedMessage = [
-            'message_id' => $groupMessage->id,
-            'message' => $groupMessage->message,
-            'sender' => [
-                    'id' => $groupMessage->sender->id,
-                    'full_name' => $groupMessage->sender->full_name,
-                    'image' => $groupMessage->sender->image ? url('profile/',$groupMessage->sender->image) : url('avatar/profile.png'),
-                ],
-            'images' => array_map(function ($image) {
-                return url('GroupMessages/' . $image);
-            }, json_decode($groupMessage->images, true) ?? []),
-            'created_at' => $groupMessage->created_at->format('Y-m-d H:i:s'),
-        ];
-        return $this->sendResponse(['message'=>$formattedMessage], 'Message sent successfully.');
+        $message = new GroupMessage();
+        $message->group_id = $request->group_id;
+        $message->sender_id = $userId;
+        $message->message = $request->message;
+        $message->images = json_encode($imagePaths);
+        $message->is_read = false;
+        $message->read_by = json_encode([]);
+        $message->save();
+
+        return $this->sendResponse($message, 'Message sent successfully.');
     }
     public function getMessages(Request $request)
     {
-        $groupId = $request->groupId;
-        $validator = Validator::make(['group_id' => $groupId], [
-            'group_id' => 'required|exists:groups,id',
-        ]);
-        if ($validator->fails()) {
-            return $this->sendError('Validation Error', $validator->errors(), 422);
-        }
-        $messages = Group::findOrFail($groupId)->messages()->with('sender')->get();
-        $formattedMessages = $messages->map(function ($message) {
+        $userId = auth()->user()->id;
+        $messages = GroupMessage::where('group_id', $request->groupId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+        $messagesData = $messages->map(function ($message) use ($userId) {
+            $images = json_decode($message->images, true);
+            if ($images) {
+                $images = array_map(function ($image) {
+                    return url('GropupMessages/' . $image);
+                }, $images);
+            }
+            $isReadByUser = in_array($userId, json_decode($message->read_by ?? '[]'));
             return [
-                'message_id' => $message->id,
+                'id' => $message->id,
+                'sender_id' => $message->sender_id,
                 'message' => $message->message,
-                'images' => collect(json_decode($message->images))->map(function ($image) {
-                      return $image
-                          ? url('GroupMessages/', $image)
-                          : url('avatar/group.png');
-                  })->toArray(),
-                'sender' => [
-                    'id' => $message->sender->id,
-                    'full_name' => $message->sender->full_name,
-                    'image' => $message->sender->image ? url('profile/',$message->sender->image) : url('avatar/profile.png'),
-                ],
+                'images' => $images,
+                'is_read' => $message->is_read,
+                'is_read_by_user' => $isReadByUser,
+                'read_by' => json_decode($message->read_by, true),
                 'created_at' => $message->created_at,
-                'updated_at' => $message->updated_at,
             ];
         });
-        $unreadMessageCount = $messages->where('sender_id', '!=', Auth::id())->where('is_read', false)->count();
+        $unreadCount = GroupMessage::where('group_id', $request->groupId)
+            ->whereRaw('JSON_CONTAINS(read_by, ?)', [json_encode([$userId])])
+            ->where('is_read', false)
+            ->count();
         return $this->sendResponse([
-            'messages' => $formattedMessages,
-            'unreadMessageCount' => $unreadMessageCount,
-        ], 'Messages retrieved successfully.');
+            'messages' => $messagesData,
+            'unread_count' => $unreadCount,
+        ], 'Messages fetched successfully.');
     }
-    public function markAsRead($messageId)
+    public function markMessageAsRead(Request $request)
     {
-        $message = GroupMessage::find($messageId);
+        $userId = auth()->user()->id;
+        $message = GroupMessage::find($request->messageId);
         if (!$message) {
             return $this->sendError('Message not found', [], 404);
         }
-        $message->is_read = !$message->is_read;
-        $message->save();
-        return $this->sendResponse([], 'Message read successfully.');
+        $readBy = json_decode($message->read_by, true) ?? [];
+        if (!in_array($userId, $readBy)) {
+            $readBy[] = $userId;
+            $message->read_by = json_encode($readBy);
+            if ($message->is_read === false) {
+                $message->is_read = true;
+            }
+            $message->save();
+        }
+        return $this->sendResponse([], 'Message marked as read successfully.');
     }
     public function deleteMessage($messageId)
     {

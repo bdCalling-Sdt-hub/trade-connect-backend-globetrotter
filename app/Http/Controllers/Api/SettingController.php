@@ -22,7 +22,9 @@ class SettingController extends Controller
             'full_name' => $user->full_name,
             'bio'=> $user->bio ?? '',
             'location' => $user->location,
-            'image' => /* $user->image ? url('profile/',$user->image) : */ url('avatar/profile.png')
+            'image' => $user->image
+                ? url('profile/',$user->image)
+                : url('avatar/profile.png')
         ];
 
         return response()->json([
@@ -31,13 +33,12 @@ class SettingController extends Controller
             'data' => $profileData,
         ], 200);
     }
-    public function personalInformation(Request $request)
+   public function personalInformation(Request $request)
     {
         $userId = auth()->user()->id;
-
         $user = User::find($userId);
-        if (!$user) {
-            return $this->sendError('User not found!', [], 404);
+        if ($user->role !== 'ADMIN') {
+            return $this->sendError('User is not an admin.', [], 403);
         }
         $validator = Validator::make($request->all(), [
             'full_name' => 'nullable|string|max:255',
@@ -50,32 +51,31 @@ class SettingController extends Controller
         if ($validator->fails()) {
             return $this->sendError('Validation Error', $validator->errors(), 400);
         }
-
         if ($request->has('full_name')) {
             $user->full_name = $request->full_name ?? $user->full_name;
         }
         if ($request->hasFile('image')) {
             if ($user->image) {
-                $oldImagePath = public_path('Profile/' . $user->image);
+                $oldImagePath = public_path('profile/' . $user->image);
                 if (file_exists($oldImagePath)) {
                     unlink($oldImagePath);
                 }
             }
-            $fileName = time() . '.' . $request->image->getClientOriginalExtension();
-            $request->image->move(public_path('Profile'). $fileName);
+            $image = $request->file('image');
+            $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('profile/'), $fileName);
             $user->image = $fileName;
         }
         if ($request->filled('old_password') && $request->filled('new_password')) {
             if (!Hash::check($request->old_password, $user->password)) {
                 return $this->sendError('Old password is incorrect.', [], 400);
             }
-
             $user->password = Hash::make($request->new_password);
         }
         $user->save();
-
         $user->makeHidden(['password', 'remember_token']);
 
         return $this->sendResponse($user, "Profile successfully updated.");
     }
+
 }

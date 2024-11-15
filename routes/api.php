@@ -115,7 +115,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
 
     Route::post('send-group-messages', [GroupController::class, 'sendGroupMessage']);
     Route::get('get-group-messages', [GroupController::class, 'getMessages']);
-    Route::patch('group-messages-read/{messageId}/', [GroupController::class, 'markAsRead']);
+    Route::put('group-messages-read', [GroupController::class, 'markMessageAsRead']);
     Route::delete('group-messages/{messageId}', [GroupController::class, 'deleteMessage']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {

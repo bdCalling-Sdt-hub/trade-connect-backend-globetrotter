@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Notifications\BalanceUpdated;
 use App\Rules\Lowercase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -451,7 +452,7 @@ class AuthController extends Controller
             }
             $image = $request->file('image');
             $fileName = time() . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
-            $image->move(public_path('profile'), $fileName);
+            $image->move(public_path('profile/'), $fileName);
         }
         $user->full_name = $request->full_name ?? $user->full_name;
         $user->image = $fileName ?? $user->image;
@@ -590,7 +591,7 @@ class AuthController extends Controller
                 'saleOrders' => $saleOrders,
                 'purchageOrders' => $purchageOrders,
             ],
-            'activities'=> $this->getCurrentYearOrderActivities(),
+            // 'activities'=> $this->getCurrentYearOrderActivities(),
             'products' => $products->map(function ($product) {
                 return [
                     'id' => $product->id,
@@ -610,24 +611,48 @@ class AuthController extends Controller
     private function getCurrentYearOrderActivities()
     {
         $currentYear = now()->year;
-        $productIds = Product::pluck('id')->toArray();
-        $totalPurchaseOrders = Order::whereIn('product_id', $productIds)
-                                     ->where('status', 'accepted')
-                                     ->whereYear('created_at', $currentYear)
-                                     ->count();
-        $totalSalesOrders = Order::whereIn('product_id', $productIds)
-                                 ->where('status', 'acceptDelivery')
-                                 ->whereYear('created_at', $currentYear)
-                                 ->count();
-        return  [
-            'purchaseOrders' => [
-                'total' => $totalPurchaseOrders,
-            ],
-            'salesOrders' => [
-                'total' => $totalSalesOrders,
-            ],
+        $user = Auth::user();
+
+        // Get total purchase orders for the user for each month
+        $purchaseOrders = Order::where('user_id', $user->id)
+            ->where('status', 'acceptDelivery')
+            ->whereYear('created_at', $currentYear)
+            ->get()
+            ->groupBy(function ($order) {
+                return Carbon::parse($order->created_at)->format('m'); // Group by month
+            });
+
+        // Get total sales orders where the product's user_id matches the authenticated user's ID
+        $salesOrders = Order::whereHas('product', function ($query) use ($user) {
+                $query->where('user_id', $user->id); // Match product user_id with auth user ID
+            })
+            ->where('status', 'acceptDelivery')
+            ->whereYear('created_at', $currentYear)
+            ->get()
+            ->groupBy(function ($order) {
+                return Carbon::parse($order->created_at)->format('m'); // Group by month
+            });
+
+        // Prepare the monthly data
+        $monthlyData = [];
+        $monthNames = [
+            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+            7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+        ];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT); // Ensure 2-digit format
+            $monthlyData[$monthNames[$month]] = [
+                'purchaseOrders' => isset($purchaseOrders[$monthKey]) ? $purchaseOrders[$monthKey]->count() : 0,
+                'salesOrders' => isset($salesOrders[$monthKey]) ? $salesOrders[$monthKey]->count() : 0,
+            ];
+        }
+
+        return [
             'year' => $currentYear,
+            'monthlyActivities' => $monthlyData,
         ];
     }
+
 
 }

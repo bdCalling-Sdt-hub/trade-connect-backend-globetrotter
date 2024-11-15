@@ -31,25 +31,30 @@ class OrderController extends Controller
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 422);
         }
-        $user = auth()->user();
-        if ($user->balance < $request->total_amount) {
-            return $this->sendError("Insufficient balance.");
+        try{
+            $user = auth()->user();
+            if ($user->balance < $request->total_amount) {
+                return $this->sendError("Insufficient balance.");
+            }
+            $order = Order::create([
+                'user_id' => $user->id,
+                'product_id' => $request->product_id,
+                'total_amount' => $request->total_amount,
+                'phone_number' => $request->phone_number,
+                'country' => $request->country,
+                'state' => $request->state,
+                'zipcode' => $request->zipcode,
+                'address' => $request->address,
+                'notes' => $request->notes,
+                'status' => $request->status,
+            ]);
+            $user->decrement('balance', $request->total_amount);
+            $order->product->user->notify(new OrderNotification($order));
+            return $this->sendResponse([],'Order created successfully');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        $order = Order::create([
-            'user_id' => $user->id,
-            'product_id' => $request->product_id,
-            'total_amount' => $request->total_amount,
-            'phone_number' => $request->phone_number,
-            'country' => $request->country,
-            'state' => $request->state,
-            'zipcode' => $request->zipcode,
-            'address' => $request->address,
-            'notes' => $request->notes,
-            'status' => $request->status,
-        ]);
-        $user->decrement('balance', $request->total_amount);
-        $order->product->user->notify(new OrderNotification($order));
-        return $this->sendResponse([],'Order created successfully');
     }
     public function getUserOrder()
     {
@@ -93,19 +98,24 @@ class OrderController extends Controller
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 422);
         }
-        $order = Order::find($request->order_id);
-        if ($order->status === 'canceled') {
-            return $this->sendError('Order is already canceled.', [], 400);
+        try{
+            $order = Order::find($request->order_id);
+            if ($order->status === 'canceled') {
+                return $this->sendError('Order is already canceled.', [], 400);
+            }
+            if ($order->status === 'accepted' || $order->status === 'deliveryRequest' || $order->status === 'acceptDelivery') {
+                return $this->sendError('Cannot cancel the order as it is already processed.', [], 400);
+            }
+            $order->status = 'canceled';
+            $order->save();
+            $user = auth()->user();
+            $user->increment('balance', $order->total_amount);
+            $order->product->user->notify(new OrderCanceledNotification($order));
+            return $this->sendResponse([], 'Order canceled and notification sent.');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        if ($order->status === 'accepted' || $order->status === 'deliveryRequest' || $order->status === 'acceptDelivery') {
-            return $this->sendError('Cannot cancel the order as it is already processed.', [], 400);
-        }
-        $order->status = 'canceled';
-        $order->save();
-        $user = auth()->user();
-        $user->increment('balance', $order->total_amount);
-        $order->product->user->notify(new OrderCanceledNotification($order));
-        return $this->sendResponse([], 'Order canceled and notification sent.');
     }
     public function getSellerOrder()
     {
@@ -122,7 +132,9 @@ class OrderController extends Controller
                         'id'        =>$order->user->id,
                         'full_name' =>$order->user->full_name,
                         'user_name' =>$order->user->user_name,
-                        'image'     =>$order->user->image ? url('profile/',$order->user->image) : url('avatar/profile.png'),
+                        'image'     =>$order->user->image
+                            ? url('profile/',$order->user->image)
+                            : url('avatar/profile.png'),
                     ],
                     'phone_number'  => $order->phone_number,
                     'address'       => [
@@ -136,7 +148,9 @@ class OrderController extends Controller
                         'product_name'  => $order->product->product_name,
                         'price'         => $order->product->price,
                         'description'   => $order->product->description,
-                        'image'         => $order->product->image ? url('products/' . $order->product->image) : url('avatar/product.png'),
+                        'image'         => $order->product->image
+                            ? url('products/' . $order->product->image)
+                            : url('avatar/product.png'),
                     ],
                     'notes'         => $order->notes,
                 ];
@@ -158,13 +172,18 @@ class OrderController extends Controller
         if (!$order) {
             return $this->sendError('Order not found.', [], 404);
         }
-        if ($order->status != 'pending') {
-            return $this->sendError('Order cannot be accepted as it is not in pending status.', [], 400);
+        try{
+            if ($order->status != 'pending') {
+                return $this->sendError('Order cannot be accepted as it is not in pending status.', [], 400);
+            }
+            $order->status = 'accepted';
+            $order->save();
+            $order->user->notify(new OrderAcceptedNotification($order));
+            return $this->sendResponse([], 'Order accepted successfully.');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        $order->status = 'accepted';
-        $order->save();
-        $order->user->notify(new OrderAcceptedNotification($order));
-        return $this->sendResponse([], 'Order accepted successfully.');
     }
     public function deliveryRequest(Request $request)
     {
@@ -178,17 +197,22 @@ class OrderController extends Controller
         if (!$order) {
             return $this->sendError('Order not found.', [], 404);
         }
-        if($order->status == 'deliveryRequest')
-        {
-            return $this->sendResponse([], 'Delivery request already initiated.');
+        try{
+            if($order->status == 'deliveryRequest')
+            {
+                return $this->sendResponse([], 'Delivery request already initiated.');
+            }
+            if ($order->status !== 'accepted') {
+                return $this->sendError('Delivery request can only be made for accepted orders.', [], 400);
+            }
+            $order->status = 'deliveryRequest';
+            $order->save();
+            $order->user->notify(new OrderDeliveryRequestNotification($order));
+            return $this->sendResponse([], 'Delivery request initiated successfully.');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        if ($order->status !== 'accepted') {
-            return $this->sendError('Delivery request can only be made for accepted orders.', [], 400);
-        }
-        $order->status = 'deliveryRequest';
-        $order->save();
-        $order->user->notify(new OrderDeliveryRequestNotification($order));
-        return $this->sendResponse([], 'Delivery request initiated successfully.');
     }
     public function acceptDelivery(Request $request)
     {
@@ -199,25 +223,33 @@ class OrderController extends Controller
             return response()->json(['error' => $validator->errors()], 422);
         }
         $order = Order::find($request->order_id);
+
         if (!$order) {
             return $this->sendError('Order not found.', [], 404);
         }
-        if ($order->status !== 'deliveryRequest') {
-            return $this->sendError('Order cannot be accepted as it is not in delivery request status.', [], 400);
+        try{
+            if ($order->status !== 'deliveryRequest') {
+                return $this->sendError('Order cannot be accepted as it is not in delivery request status.', [], 400);
+            }
+            $order->status = 'acceptDelivery';
+            $order->save();
+            $product = $order->product;
+            $productOwner = $product->user;
+            $productOwner->balance += $order->product->price;
+            $productOwner->save();
+
+             Wallet::create([
+                "user_id" => $order->user_id,
+                "amount" => $order->total_amount,
+                "total_love" => $order->product->price,
+                "payment_method" => $request->payment_method ?? 'manual...',
+                "status" => "buy"
+            ]);
+            return $this->sendResponse($order, 'Delivery accepted successfully.');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        $order->status = 'acceptDelivery';
-        $order->save();
-        $product = $order->product;
-        $productOwner = $product->user;
-        $productOwner->increment('balance', $productOwner->price);
-         Wallet::create([
-            "user_id" => $order->user_id,
-            "amount" => $order->total_amount,
-            "total_love" => $productOwner->price,
-            "payment_method" => $request->payment_method ?? 'manual',
-            "status" => "buy"
-        ]);
-        return $this->sendResponse($order, 'Delivery accepted successfully.');
     }
     public function rejectDelivery(Request $request)
     {
@@ -227,20 +259,25 @@ class OrderController extends Controller
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 422);
         }
-        $order = Order::find($request->order_id);
-        if (!$order) {
-            return response()->json(['message' => 'Order not found.'], 404);
+        try{
+            $order = Order::find($request->order_id);
+            if (!$order) {
+                return response()->json(['message' => 'Order not found.'], 404);
+            }
+            if ($order->status == 'rejectDelivery') {
+                return response()->json(['message' => 'This order has already been rejected.'], 200);
+            }
+            if ($order->status !== 'deliveryRequest') {
+                return response()->json(['message' => 'Only orders with a delivery request can be rejected.'], 400);
+            }
+            $order->status = 'rejectDelivery';
+            $order->save();
+            $order->product->user->notify(new OrderRejectedNotification($order));
+            return response()->json(['message' => 'Order delivery rejected successfully.'], 200);
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        if ($order->status == 'rejectDelivery') {
-            return response()->json(['message' => 'This order has already been rejected.'], 200);
-        }
-        if ($order->status !== 'deliveryRequest') {
-            return response()->json(['message' => 'Only orders with a delivery request can be rejected.'], 400);
-        }
-        $order->status = 'rejectDelivery';
-        $order->save();
-        $order->product->user->notify(new OrderRejectedNotification($order));
-        return response()->json(['message' => 'Order delivery rejected successfully.'], 200);
     }
     public function rejectedDelivery(Request $request)
     {
@@ -303,22 +340,27 @@ class OrderController extends Controller
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
-        $order = Order::find($request->order_id);
-        if (!$order) {
-            return $this->sendError('Order not found.');
+        try{
+            $order = Order::find($request->order_id);
+            if (!$order) {
+                return $this->sendError('Order not found.');
+            }
+            if($order->status == 'amountReturned')
+            {
+                return $this->sendResponse([], 'Amount already returned to the user.');
+            }
+            $user = $order->user;
+            if ($user->balance >= 0) {
+                $user->balance= $order->total_amount;
+            } else {
+                return $this->sendError('User does not have a balance record.');
+            }
+            $order->status = 'amountReturned';
+            $order->save();
+            return $this->sendResponse([], 'Amount has been successfully returned to the user.');
+
+            } catch (\Exception $e) {
+            return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
         }
-        if($order->status == 'amountReturned')
-        {
-            return $this->sendResponse([], 'Amount already returned to the user.');
-        }
-        $user = $order->user;
-        if ($user->balance >= 0) {
-            $user->balance= $order->total_amount;
-        } else {
-            return $this->sendError('User does not have a balance record.');
-        }
-        $order->status = 'amountReturned';
-        $order->save();
-        return $this->sendResponse([], 'Amount has been successfully returned to the user.');
     }
 }
