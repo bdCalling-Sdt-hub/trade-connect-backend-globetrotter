@@ -53,10 +53,15 @@ class ProductController extends Controller
                     'product_code' => $product->product_code,
                     'product_description' => $product->description,
                     'product_status' => $product->status,
-                    'images' => json_decode($product->images),
+                    'images' => collect(json_decode($product->images))->map(function ($image) {
+                        return $image ? url("products/", $image) : url('avatar/product.png');
+                    }),
                     'shop' => [
                         'shop_name' => $product->shop->shop_name,
                         'seller_name' => $product->shop->user->full_name,
+                        'image' => $product->shop->user->image
+                            ? url('profile/',$product->user->image)
+                            : url('avatar/profile.png'),
                     ],
                 ];
             });
@@ -311,7 +316,6 @@ class ProductController extends Controller
             return $this->sendError([], "No shop found for the authenticated user.");
         }
         $products = Product::where('shop_id', $shop->id)
-            ->where('status', 'approved')
             ->with(['category', 'shop.user'])
             ->orderBy('id', 'desc')
             ->get();

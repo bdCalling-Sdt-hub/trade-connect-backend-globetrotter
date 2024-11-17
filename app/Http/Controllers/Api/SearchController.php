@@ -17,18 +17,14 @@ class SearchController extends Controller
         $request->validate([
             'query' => 'required|string|min:1',
         ]);
-
         $query = $request->input('query');
-
         $results = [
             'posts' => $this->post($query),
             'products' => $this->product($query),
             'people' => $this->people($query),
         ];
-
         return $this->sendResponse($results, 'Search results retrieved successfully.');
     }
-
     private function post(string $query)
     {
         $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')->get();
@@ -44,7 +40,7 @@ class SearchController extends Controller
                     'user_id'   => $userData->id,
                     'full_name' => $userData->full_name,
                     'user_name' => $userData->user_name,
-                    'image'     => $userData ? url('Profile/', $userData->image) : '',
+                    'image' => $userData->image ? url('profile/', $userData->image) : url('avatar/profile.png'),
                 ],
                 'content'         => $newsFeed->share_your_thoughts,
                 'image_count'     => count($decodedImages),
@@ -84,31 +80,35 @@ class SearchController extends Controller
 
     private function product(string $query)
     {
-        $products = Product::where('product_name', 'like', '%' . $query . '%')->get();
+        $products = Product::where('status', 'approved')->where('product_name', 'like', '%' . $query . '%')->get();
 
         return $products->map(function ($product) {
             return [
                 'id' => $product->id,
                 'full_name' => $product->user->full_name,
                 'user_name' => $product->user->user_name,
-                'image' => $product->user->image ? url('Profile/', $product->user->image) : '',
+                'image' => $product->user->image ? url('profile/', $product->user->image) : url('avatar/profile.png'),
                 'product_name' => $product->product_name,
                 'category_name' => $product->category->category_name ?? 'N/A',
                 'product_code' => $product->product_code,
                 'price' => $product->price,
                 'description' => $product->description ?? 'N/A',
                 'created_at' => $product->created_at->format('Y-m-d H:i:s'),
-                'product_images' => collect(json_decode($product->images))->map(fn($image) => $image ? url('products/', $image) : '')->toArray(),
+                'images' => collect(json_decode($product->images))->map(function ($image) {
+                    return $image ? url("products/", $image) : url('avatar/product.png');
+                }),
                 'shop' => [
                     'shop_name' => $product->shop->shop_name,
                     'seller' => [
                         'seller_name' => $product->shop->user->full_name,
+                        'user_name' => $product->shop->user->user_name,
+                        'email' => $product->shop->user->email,
+                        'image' => $product->shop->user->image ? url('profile/', $product->user->image) : url('avatar/profile.png'),
                     ],
                 ],
             ];
         })->toArray();
     }
-
     private function people(string $query)
     {
         $users = User::where('user_name', 'like', '%' . $query . '%')->get();
@@ -119,7 +119,7 @@ class SearchController extends Controller
                 'full_name' => $user->full_name,
                 'user_name' => $user->user_name,
                 'email' => $user->email,
-                'image' => $user->image ? url('Profile/', $user->image) : '',
+                'image' => $user->image ? url('profile/', $user->image) : url('avatar/profile.png'),
             ];
         })->toArray();
     }
@@ -190,7 +190,4 @@ class SearchController extends Controller
         }
         return $this->sendResponse($users, 'Successfully retrieved people.');
     }
-
-
-
 }

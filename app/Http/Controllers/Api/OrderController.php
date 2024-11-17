@@ -243,7 +243,7 @@ class OrderController extends Controller
                 "amount" => $order->total_amount,
                 "total_love" => $order->product->price,
                 "payment_method" => $request->payment_method ?? 'manual...',
-                "status" => "buy"
+                "status" => "purchage"
             ]);
             return $this->sendResponse($order, 'Delivery accepted successfully.');
 
@@ -281,7 +281,19 @@ class OrderController extends Controller
     }
     public function rejectedDelivery(Request $request)
     {
-        $rejectedOrders = Order::where('status', 'rejectDelivery')->paginate(10);
+        $query = Order::where('status', 'rejectDelivery')
+                    ->orWhere('status', 'amountReturned');
+
+        // Apply search filter if provided
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->whereHas('user', function ($userQuery) use ($search) {
+                $userQuery->where('user_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('full_name', 'like', "%{$search}%");
+            });
+        }
+        $rejectedOrders = $query->paginate(10);
         if ($rejectedOrders->isEmpty()) {
             return response()->json([
                 'data' => [],
@@ -289,7 +301,7 @@ class OrderController extends Controller
                 'status' => 404
             ]);
         }
-        $rejectedOrdersData = $rejectedOrders->map(function($order) {
+        $rejectedOrdersData = $rejectedOrders->map(function ($order) {
             return [
                 'order_id' => $order->id,
                 'user_id' => $order->user_id,
@@ -320,6 +332,7 @@ class OrderController extends Controller
                 ]
             ];
         });
+
         return response()->json([
             'data' => $rejectedOrdersData,
             'pagination' => [
@@ -332,6 +345,7 @@ class OrderController extends Controller
             'status' => 200
         ]);
     }
+
     public function returnAmount(Request $request)
     {
         $validator = Validator::make($request->all(), [

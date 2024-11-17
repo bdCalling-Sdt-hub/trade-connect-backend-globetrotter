@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('payment_method');
             $table->decimal('total_love', 10, 2)->default(0.00);
             $table->decimal('amount', 10, 2)->default(0.00);
-            $table->enum('status',['send','received','buy']);
+            $table->enum('status',['send','received','buy','purchage']);
             $table->timestamps();
         });
     }

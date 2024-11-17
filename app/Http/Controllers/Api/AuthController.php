@@ -26,6 +26,25 @@ use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use Illuminate\Support\Str;
 class AuthController extends Controller
 {
+    public function profileUpdate(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
+        ]);
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
+        }
+        $user = auth()->user();
+        if ($request->hasFile('image')) {
+            $imagePath = time() . '.' . $request->image->getClientOriginalExtension();
+            $request->image->move(public_path('profile'), $imagePath);
+            $image =$imagePath;
+        }
+        $user->image = $image ?? $user->image;
+        $user->save();
+
+        return $this->sendResponse($user, 'Profile updated successfully.');
+    }
     public function socialLogin(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -34,7 +53,6 @@ class AuthController extends Controller
             'google_id' => 'string|nullable',
             'facebook_id' => 'string|nullable',
         ]);
-
         if ($validator->fails()) {
             return response()->json($validator->errors(), 400);
         }
@@ -80,7 +98,6 @@ class AuthController extends Controller
         }
         return $userName;
     }
-
     protected function responseWithToken($token)
     {
         return $this->sendResponse($token, 'User logged in successfully.');
@@ -140,10 +157,8 @@ class AuthController extends Controller
     public function validateToken()
     {
         try {
-            // Log the token for debugging
             $token = JWTAuth::getToken();
             \Log::info('Token being validated: ' . $token);
-
             $user = JWTAuth::parseToken()->authenticate();
             if (!$user) {
                 return response()->json([
@@ -169,7 +184,6 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $user = User::where('email', $request->email)->where('verify_email', 0)->first();
-
         if ($user) {
             $this->sendOtpEmail($user);
             return response()->json([
@@ -190,7 +204,6 @@ class AuthController extends Controller
         }
         $user = $this->createUser($request);
         $this->sendOtpEmail($user);
-
         return response()->json(['success' => 'User registered successfully. OTP sent to your email.'], 201);
     }
     private function createUser($request)
@@ -203,9 +216,7 @@ class AuthController extends Controller
             $input['otp_expires_at'] = now()->addMinutes(10);
             $input['verify_email'] = 0;
             $input['user_name'] = strtolower(str_replace(' ', '_', $input['user_name']));
-
             return User::create($input);
-
             } catch (\Exception $e) {
                 return $this->sendError('User Create Errors', ['error' => $e->getMessage()], 500);
         }
@@ -234,18 +245,15 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'otp' => 'required|numeric',
         ]);
-
         if ($validator->fails()) {
             return response()->json(['error' => 'Validation Error.', 'messages' => $validator->errors()], 422);
         }
-
         $user = User::where('otp', $request->otp)
                     ->where('verify_email', 0)
                     ->first();
         if (!$user) {
             return response()->json(['error' => 'Invalid OTP or the email is already verified.'], 401);
         }
-
         if (now()->greaterThan($user->otp_expires_at)) {
             return response()->json(['error' => 'OTP has expired. Please request a new one.'], 401);
         }
@@ -268,7 +276,6 @@ class AuthController extends Controller
             'token' => $token,
         ]);
     }
-
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -336,7 +343,6 @@ class AuthController extends Controller
             'password'   => 'required|min:8|max:60',
             'c_password' => 'required|same:password',
         ]);
-
         if ($validator->fails()) {
             return response()->json($validator->errors(), 400);
         } else {
@@ -347,7 +353,6 @@ class AuthController extends Controller
     public function updatePassword(Request $request)
     {
         $user = Auth::user();
-
         if (!$user) {
             return response()->json(['status' => 401, 'message' => 'You are not authorized!'], 401);
         }
@@ -356,7 +361,6 @@ class AuthController extends Controller
             'new_password' => 'required|string|min:6|different:current_password',
             'confirm_password' => 'required|string|same:new_password',
         ]);
-
         if ($validator->fails()) {
             return response()->json(['status' => 409, 'errors' => $validator->errors()], 409);
         }
@@ -364,7 +368,6 @@ class AuthController extends Controller
             return response()->json(['status' => 409, 'message' => 'Your current password is incorrect'], 409);
         }
         $user->update(['password' => Hash::make($request->new_password)]);
-
         return response()->json(['status' => 200, 'message' => 'Password updated successfully'], 200);
     }
     public function user()
@@ -385,7 +388,6 @@ class AuthController extends Controller
                 'image' => $user->image ? url('profile/' . $user->image) : url('avatar/profile.png'),
             ];
         });
-
         return response()->json(['status' => 200, 'users' => $formattedUsers], 200);
     }
     public function resendOtp(Request $request)
@@ -393,13 +395,11 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|exists:users,email',
         ]);
-
         if ($validator->fails()) {
             return response()->json(['status' => 422, 'errors' => $validator->errors()], 422);
         }
         $user = User::where('email', $request->email)->first();
         Mail::to($user->email)->queue(new OtpVerificationMail($user));
-
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }
     public function getProfile(Request $request)
@@ -420,7 +420,6 @@ class AuthController extends Controller
             'location' => $user->location,
             'image' => $imageUrl,
         ];
-
         return response()->json([
             'status' => true,
             'message' => 'User profile fetched successfully.',
@@ -459,7 +458,6 @@ class AuthController extends Controller
         $user->location = $request->location ?? $user->location;
         $user->bio = $request->bio ?? $user->bio;
         $user->save();
-
         return $this->sendResponse($user, 'Profile updated successfully.');
     }
     public function isActive()
@@ -467,7 +465,6 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->is_active = true;
         $user->save();
-
         return $this->sendResponse($user, 'User active status updated successfully.');
     }
     public function noActive()
@@ -475,7 +472,6 @@ class AuthController extends Controller
         $user = Auth::user();
         $user->is_active = false;
         $user->save();
-
         return $this->sendResponse($user, 'User no active status updated successfully.');
     }
     protected function respondWithToken($token)
@@ -507,9 +503,7 @@ class AuthController extends Controller
             }
             $userToUpdate->role = $request->role;
             $userToUpdate->save();
-
             return response()->json(['message' => 'User role updated successfully.', 'user' => $userToUpdate]);
-
         } catch (\Exception $e) {
             return response()->json(['message' => 'Error updating user role', 'error' => $e->getMessage()], 500);
         }
@@ -524,7 +518,6 @@ class AuthController extends Controller
                 ->orWhere('email', 'LIKE', "%{$query}%")
                 ->orderBy('id', 'DESC')
                 ->paginate(10);
-
             $formattedUsers = $users->map(function ($user) {
                 return [
                     'id' => $user->id,
@@ -608,51 +601,42 @@ class AuthController extends Controller
         ];
         return $this->sendResponse($response, 'User products retrieved successfully.');
     }
-    private function getCurrentYearOrderActivities()
-    {
-        $currentYear = now()->year;
-        $user = Auth::user();
-
-        // Get total purchase orders for the user for each month
-        $purchaseOrders = Order::where('user_id', $user->id)
-            ->where('status', 'acceptDelivery')
-            ->whereYear('created_at', $currentYear)
-            ->get()
-            ->groupBy(function ($order) {
-                return Carbon::parse($order->created_at)->format('m'); // Group by month
-            });
-
-        // Get total sales orders where the product's user_id matches the authenticated user's ID
-        $salesOrders = Order::whereHas('product', function ($query) use ($user) {
-                $query->where('user_id', $user->id); // Match product user_id with auth user ID
-            })
-            ->where('status', 'acceptDelivery')
-            ->whereYear('created_at', $currentYear)
-            ->get()
-            ->groupBy(function ($order) {
-                return Carbon::parse($order->created_at)->format('m'); // Group by month
-            });
-
-        // Prepare the monthly data
-        $monthlyData = [];
-        $monthNames = [
-            1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
-            7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
-        ];
-
-        for ($month = 1; $month <= 12; $month++) {
-            $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT); // Ensure 2-digit format
-            $monthlyData[$monthNames[$month]] = [
-                'purchaseOrders' => isset($purchaseOrders[$monthKey]) ? $purchaseOrders[$monthKey]->count() : 0,
-                'salesOrders' => isset($salesOrders[$monthKey]) ? $salesOrders[$monthKey]->count() : 0,
-            ];
-        }
-
-        return [
-            'year' => $currentYear,
-            'monthlyActivities' => $monthlyData,
-        ];
-    }
-
-
+    // private function getCurrentYearOrderActivities()
+    // {
+    //     $currentYear = now()->year;
+    //     $user = Auth::user();
+    //     $purchaseOrders = Order::where('user_id', $user->id)
+    //         ->where('status', 'acceptDelivery')
+    //         ->whereYear('created_at', $currentYear)
+    //         ->get()
+    //         ->groupBy(function ($order) {
+    //             return Carbon::parse($order->created_at)->format('m');
+    //         });
+    //     $salesOrders = Order::whereHas('product', function ($query) use ($user) {
+    //             $query->where('user_id', $user->id); // Match product user_id with auth user ID
+    //         })
+    //         ->where('status', 'acceptDelivery')
+    //         ->whereYear('created_at', $currentYear)
+    //         ->get()
+    //         ->groupBy(function ($order) {
+    //             return Carbon::parse($order->created_at)->format('m'); // Group by month
+    //         });
+    //     // Prepare the monthly data
+    //     $monthlyData = [];
+    //     $monthNames = [
+    //         1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+    //         7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+    //     ];
+    //     for ($month = 1; $month <= 12; $month++) {
+    //         $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT); // Ensure 2-digit format
+    //         $monthlyData[$monthNames[$month]] = [
+    //             'purchaseOrders' => isset($purchaseOrders[$monthKey]) ? $purchaseOrders[$monthKey]->count() : 0,
+    //             'salesOrders' => isset($salesOrders[$monthKey]) ? $salesOrders[$monthKey]->count() : 0,
+    //         ];
+    //     }
+    //     return [
+    //         'year' => $currentYear,
+    //         'monthlyActivities' => $monthlyData,
+    //     ];
+    // }
 }
