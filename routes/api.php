@@ -46,7 +46,7 @@ Route::group(['middleware' => ['api'],'controller' => AuthController::class], fu
     Route::patch('/isActive', 'isActive')->middleware(['jwt.auth','member']);
     Route::patch('/noActive', 'noActive')->middleware(['jwt.auth','member']);
     Route::get('/validate-token',  'validateToken')->middleware(['jwt.auth','member']);
-
+    Route::put('/profile-update-image',  'profileUpdate')->middleware(['jwt.auth','member']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::post('/privacy-private', [ProfileController::class, 'privacyPrivate']);
@@ -97,22 +97,18 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::get('your-group', [GroupController::class, 'yourGroup']);
     Route::get('other-group', [GroupController::class, 'otherGroup']);
-
     Route::post('join-group-request', [GroupController::class, 'joinGroupRequest']);
     Route::post('accept-join-request/{id}', [GroupController::class, 'acceptJoinRequest']);
-
     Route::get('groups', [GroupController::class, 'index']);
     Route::get('search-people', [GroupController::class, 'peopleSearch']);
     Route::get('peoples', [GroupController::class, 'peoples']);
     Route::post('groups', [GroupController::class, 'store']);
     Route::put('update-group', [GroupController::class, 'update']);
     Route::delete('delete-group', [GroupController::class, 'destroy']);
-
     Route::get('group-members', [GroupController::class, 'groupMembers']);
     Route::put('add-group-members', [GroupController::class, 'addMembers']);
     Route::delete('remove-group-member', [GroupController::class, 'removeMember']);
     Route::delete('leave-group', [GroupController::class, 'leaveGroup']);
-
     Route::post('send-group-messages', [GroupController::class, 'sendGroupMessage']);
     Route::get('get-group-messages', [GroupController::class, 'getMessages']);
     Route::put('group-messages-read', [GroupController::class, 'markMessageAsRead']);
@@ -143,7 +139,6 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::put('cancel-order', [OrderController::class, 'cancelOrder']);
     Route::put('accept-delivery', [OrderController::class, 'acceptDelivery']);
     Route::put('reject-delivery', [OrderController::class, 'rejectDelivery']);
-
     Route::get('get-seller-order', [OrderController::class, 'getSellerOrder']);
     Route::put('accept-order', [OrderController::class, 'acceptOrder']);
     Route::put('delivery-request', [OrderController::class, 'deliveryRequest']);
@@ -155,7 +150,6 @@ Route::middleware(['api', 'jwt.auth','member'])->group(function () {
     Route::get('my-request', [WalletController::class, 'myRequest']);
     Route::post('accept-request-love/{requestLoveId}', [WalletController::class, 'acceptRequestLove']);
     Route::put('reject-request-love/{requestLoveId}', [WalletController::class, 'rejecttRequestLove']);
-
     Route::post('transger-love', [WalletController::class, 'transferLove']);
     Route::get('wallet-transger-histories', [WalletController::class, 'walletTransferHistory']);
 });
@@ -178,7 +172,6 @@ Route::middleware(['api', 'jwt.auth','admin'])->group(function () {
     Route::get('searchUser', [AuthController::class, 'searchUser']);
     Route::get('user-details', [AuthController::class, 'userDetails']);
     Route::put('update-role/{id}', [AuthController::class, 'updateRole']);
-    // Route::delete('deleteUser/{id}', [AuthController::class, 'deleteUser']);
     Route::put('increase-balance/{userId}', [AuthController::class, 'increaseBalance']);
     Route::put('decrease-balance/{userId}', [AuthController::class, 'decreaseBalance']);
 });
