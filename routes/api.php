@@ -27,8 +27,6 @@ use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\TermAndConditioncontroller;
 
-
-
 Route::group(['middleware' => ['api'],'controller' => AuthController::class], function () {
     Route::post('/register', 'register')->withoutMiddleware('jwt.auth');
     Route::post('/login', 'login')->withoutMiddleware('jwt.auth');
@@ -70,6 +68,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::delete('/cancel-request/{friend_id}', [FriendController::class, 'cancelRequest']);
     Route::get('/user-friend-requests', [FriendController::class, 'userFriendRequests']);
     Route::get('/user-friends', [FriendController::class, 'userFriends']);
+    Route::get('/get-send-friend-request', [FriendController::class, 'getSendFriendRequest']);
 });
 Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::post('like-newsfeed', [LikeController::class, 'likeNewsfeed']);

@@ -123,4 +123,39 @@ class FriendController extends Controller
             'friends' => $friends
         ]);
     }
+    public function getSendFriendRequest()
+    {
+        $authUserId = auth()->id();
+        $outgoingRequests = Friend::with('friend')
+            ->where('user_id', $authUserId)
+            ->where('is_accepted', false)
+            ->get()
+            ->map(function ($request) {
+                return [
+                    'request_id' => $request->id,
+                    'friend_id' => $request->friend->id,
+                    'full_name' => $request->friend->full_name,
+                    'user_name' => $request->friend->user_name,
+                    'email' => $request->friend->email,
+                    'image' => $request->friend->image
+                        ? url('profile/' . $request->friend->image)
+                        : url('avatar/profile.png'),
+                    'created_at' => $request->created_at->toIso8601String(),
+                ];
+            });
+        if ($outgoingRequests->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No outgoing friend requests found.',
+                'data' => [],
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Outgoing friend requests retrieved successfully.',
+            'data' => $outgoingRequests,
+        ]);
+    }
+
 }

@@ -64,10 +64,8 @@ class ProfileController extends Controller
                 return $this->sendError('No available data found', 403);
             }
         }
-
         return $this->formatUserProfile($anotherUser, $request);
     }
-
     private function formatUserProfile($user, Request $request)
     {
         $privacyFilter = $request->input('privacy', null);
@@ -100,16 +98,15 @@ class ProfileController extends Controller
         $formattedNewsFeeds = $newsFeeds->map(function ($newsFeed) use ($user) {
             $decodedImages = json_decode($newsFeed->images);
             return [
-                'id'            => $newsFeed->id,
-                'content'       => $newsFeed->share_your_thoughts,
-                'privacy'       => $newsFeed->privacy,
-                'image_count'     => count($decodedImages),
-                'images'          => collect(json_decode($newsFeed->images))->map(function ($image) {
+                'id'          => $newsFeed->id,
+                'content'     => $newsFeed->share_your_thoughts,
+                'privacy'     => $newsFeed->privacy,
+                'image_count' => count($decodedImages),
+                'images'      => collect(json_decode($newsFeed->images))->map(function ($image) {
                                         return [
                                         'url' => $image ? url('NewsFeedImages/', $image) : '',
                                         ];
                                     })->toArray(),
-
                 'newsfeed_status' => $newsFeed->status ? 'active' : 'inactive',
                 'user'=>[
                     'id'=> $newsFeed->user->id ?? '',
@@ -128,7 +125,9 @@ class ProfileController extends Controller
                         'id'            => $comment->id,
                         'full_name'     => $comment->user->full_name,
                         'user_name'     => $comment->user->user_name,
-                        'image'         => $comment->user->image ? url('profile/',$comment->user->image) :url('avatar/profile.png'),
+                        'image'         => $comment->user->image
+                                            ? url('profile/',$comment->user->image)
+                                            :url('avatar/profile.png'),
                         'comment'       => $comment->comments,
                         'created_at'    => $this->getTimePassed($comment->created_at),
                         'reply_count'   => $comment->replies->count(),
@@ -138,7 +137,9 @@ class ProfileController extends Controller
                                 'comment'    => $reply->comments,
                                 'full_name'  => $reply->user->full_name,
                                 'user_name'  => $reply->user->user_name,
-                                'image'      => $reply->user->image ? url('profile/',$reply->user->image) : url('avatar/profile.png'),
+                                'image'      => $reply->user->image
+                                            ? url('profile/',$reply->user->image)
+                                            : url('avatar/profile.png'),
                                 'created_at' => $this->getTimePassed($reply->created_at),
                             ];
                         })
@@ -151,6 +152,14 @@ class ProfileController extends Controller
         if ($shopData) {
             $shop = [
                 'shop_name' => $shopData->shop_name,
+                'seller'=>[
+                    'full_name' => $shopData->user->full_name,
+                    'user_name' => $shopData->user->user_name,
+                    'email' => $shopData->user->email,
+                    'image' => $shopData->user->image
+                            ? url('profile/', $shopData->user->image)
+                            : url('avatar/profile.png'),
+                ]
             ];
         }
         $formattedProducts = $user->products->map(function ($product) {
@@ -159,16 +168,19 @@ class ProfileController extends Controller
                 'product_name'=> $product->product_name,
                 'product_code'=> $product->product_code,
                 'category_name'=> $product->category->category_name,
-                'price'       => $product->price,
-                'product_images'      => collect(json_decode($product->images))->map(function ($image) {
-                                    return $image ? url('products/', $image) : url('avatar/product.png');
-
+                'price' => $product->price,
+                'product_images'=> collect(json_decode($product->images))->map(function ($image) {
+                                    return $image
+                                    ? url('products/', $image)
+                                    : url('avatar/product.png');
                                 }),
                 'description' => $product->description,
                 'shop_name'   => $product->shop->shop_name,
                 'seller_name' => $product->shop->user->full_name,
                 'seller_user_name' => $product->shop->user->user_name,
-                'seller_image' => $product->shop->user->image ? url('profile/', $product->shop->user->image) : url('avatar/profile.png'),
+                'seller_image' => $product->shop->user->image
+                                ? url('profile/', $product->shop->user->image)
+                                : url('avatar/profile.png'),
                 'created_at'  => $product->created_at->format('Y-m-d H:i:s'),
             ];
         });
@@ -179,7 +191,9 @@ class ProfileController extends Controller
             'bio'           => $user->bio,
             'privacy'       => $user->privacy,
             'email'         => $user->email,
-            'image'         => $user->image ? url('profile/',$user->image) : url('avatar/profile.png'),
+            'image'         => $user->image
+                            ? url('profile/',$user->image)
+                            : url('avatar/profile.png'),
             'friends_count' => $friendsCount,
             'news_feeds'    => $formattedNewsFeeds ?? '',
             'shop'          => $shop ?? '',

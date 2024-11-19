@@ -94,7 +94,7 @@ class SearchController extends Controller
                 'price' => $product->price,
                 'description' => $product->description ?? 'N/A',
                 'created_at' => $product->created_at->format('Y-m-d H:i:s'),
-                'images' => collect(json_decode($product->images))->map(function ($image) {
+                'product_images' => collect(json_decode($product->images))->map(function ($image) {
                     return $image ? url("products/", $image) : url('avatar/product.png');
                 }),
                 'shop' => [
@@ -103,7 +103,7 @@ class SearchController extends Controller
                         'seller_name' => $product->shop->user->full_name,
                         'user_name' => $product->shop->user->user_name,
                         'email' => $product->shop->user->email,
-                        'image' => $product->shop->user->image ? url('profile/', $product->user->image) : url('avatar/profile.png'),
+                        'image' => $product->shop->user->image ? url('profile/', $product->shop->user->image) : url('avatar/profile.png'),
                     ],
                 ],
             ];
