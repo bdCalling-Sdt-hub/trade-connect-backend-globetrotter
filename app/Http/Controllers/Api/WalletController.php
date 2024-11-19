@@ -147,7 +147,7 @@ class WalletController extends Controller
         }
         try {
             $user = Auth::user();
-            if($user->blance >= $request->total_love){
+            if($user->balance >= $request->total_love){
                 $wallet = Wallet::create([
                     "user_id" => $user->id,
                     "amount" => $request->amount,

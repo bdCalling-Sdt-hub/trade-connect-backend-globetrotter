@@ -399,6 +399,7 @@ class AuthController extends Controller
             return response()->json(['status' => 422, 'errors' => $validator->errors()], 422);
         }
         $user = User::where('email', $request->email)->first();
+        $this->sendOtpEmail($user);
         Mail::to($user->email)->queue(new OtpVerificationMail($user));
         return response()->json(['status' => 200, 'message' => 'OTP has been resent successfully.'], 200);
     }

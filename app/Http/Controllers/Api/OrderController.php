@@ -26,7 +26,7 @@ class OrderController extends Controller
             'zipcode' => 'nullable|string',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
-            'status' => 'nullable|in:pending,canceled,accepted,deliveryRequest,acceptDelivery',
+            // 'status' => 'nullable|in:pending,canceled,accepted,deliveryRequest,acceptDelivery',
         ]);
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 422);
@@ -46,11 +46,11 @@ class OrderController extends Controller
                 'zipcode' => $request->zipcode,
                 'address' => $request->address,
                 'notes' => $request->notes,
-                'status' => $request->status,
+                // 'status' => $request->status,
             ]);
             $user->decrement('balance', $request->total_amount);
             $order->product->user->notify(new OrderNotification($order));
-            return $this->sendResponse([],'Order created successfully');
+            return $this->sendResponse($order,'Order created successfully');
 
             } catch (\Exception $e) {
             return response()->json(['error' => 'An error occurred: ' . $e->getMessage()], 500);
