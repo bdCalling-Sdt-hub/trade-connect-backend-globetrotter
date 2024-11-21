@@ -36,6 +36,9 @@ class CommentReplyNotification extends Notification
         return [
             'comment_id' => $this->comment->id,
             'user_id' => $this->comment->user_id,
+            'image' => $this->comment->user->image
+                    ? url('profile/',$this->comment->user->image)
+                    : url('avatar/profile.png'),
             'newsfeed_id' => $this->comment->newsfeed_id,
             'message' => 'You have a new reply to your comment.',
             'content' => $this->comment->comments,

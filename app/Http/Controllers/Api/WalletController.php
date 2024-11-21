@@ -103,12 +103,14 @@ class WalletController extends Controller
     }
     public function myRequest()
     {
-        $user = Auth()->user();
-        if(!$user){
-            return $this->sendError("User not found.");
+        $user = auth()->user();
+
+        if (!$user) {
+            return $this->sendError('User not found.');
         }
-        $requestLoves = RequestLove::where('user_id', $user->id)
+        $requestLoves = RequestLove::where('request_id', $user->id)
             ->where('status', 'pending')
+            ->with('requestedBy')
             ->get()
             ->map(function ($love) {
                 return [
@@ -116,21 +118,24 @@ class WalletController extends Controller
                     'amount' => $love->amount,
                     'status' => $love->status,
                     'requested_by' => [
-                        'request_id' => $love->request_id,
-                        'full_name' => $love->requestedBy->full_name,
-                        'user_name' => $love->requestedBy->user_name,
-                        'email' => $love->requestedBy->email,
-                        'image' => $love->requestedBy->image ? url('profile/' . $love->requestedBy->image) : url('avatar/profile.png'),
+                        'user_id' => $love->id,
+                        'full_name' => $love->user->full_name ?? 'N/A',
+                        'user_name' => $love->user->user_name ?? 'N/A',
+                        'email' => $love->user->email ?? 'N/A',
+                        'image' => $love->user->image
+                            ? url('profile/' . $love->user->image)
+                            : url('avatar/profile.png'),
                     ],
                     'created_at' => $love->created_at->format('Y-m-d H:i:s'),
                 ];
             });
 
         if ($requestLoves->isEmpty()) {
-            return $this->sendError('No pending requests found.');
+            return $this->sendResponse([],'No pending requests found.');
         }
         return $this->sendResponse($requestLoves, 'Pending requests retrieved successfully.');
     }
+
     public function acceptRequestLove(Request $request, $requestLoveId)
     {
         $validator = Validator::make($request->all(), [
@@ -161,7 +166,7 @@ class WalletController extends Controller
                     $requestedUser = $requestLove->requestedBy;
                     $requestedUser->increment('balance', $wallet->total_love);
                 }
-                $requestedUser->notify(new ReceivedLoveNotification($wallet));
+                $requestedUser->notify(new ReceivedLoveNotification($wallet,$requestedUser));
                 return $this->sendResponse($wallet, 'Wallet transfer successfully.');
             }else{
                 return $this->sendError("Insufficient balance.");
@@ -207,7 +212,7 @@ class WalletController extends Controller
                 ]);
                  $user->decrement('balance', $request->amount);
                  $receivedUser->increment('balance', $wallet->total_love);
-                $receivedUser->notify(new ReceivedLoveNotification($wallet));
+                $receivedUser->notify(new ReceivedLoveNotification($wallet, $receivedUser));
 
                 return $this->sendResponse($wallet, 'Wallet transfer successfully.');
             }else{

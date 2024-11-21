@@ -13,11 +13,12 @@ class BalanceUpdated extends Notification
 
     protected $amount;
     protected $type; // 'increase' or 'decrease'
-
-    public function __construct($amount, $type)
+    protected $user;
+    public function __construct($user,$amount, $type)
     {
         $this->amount = $amount;
         $this->type = $type;
+        $this->user = $user;
     }
 
     public function via($notifiable)
@@ -33,6 +34,10 @@ class BalanceUpdated extends Notification
                 : "Your balance was decreased by {$this->amount} from Admin.",
             'amount' => $this->amount,
             'type' => $this->type,
+            'user' => $this->user->id,
+            'image' => $this->user->image
+                    ? url('profile/',$this->user->image)
+                    : url('avatar/profile.png'),
         ];
     }
 }

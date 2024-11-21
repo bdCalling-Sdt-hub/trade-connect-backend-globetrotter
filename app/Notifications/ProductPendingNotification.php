@@ -33,6 +33,10 @@ class ProductPendingNotification extends Notification
     {
         return [
             'product_id' => $this->product->id,
+            'user_id' =>$this->product->user_id,
+            'image' => $this->product->user->image
+                    ? url('profile/',$this->product->user->image)
+                    : url('avatar/profile.png'),
             'product_name' => $this->product->product_name,
             'message' => 'Your product "' . $this->product->product_name . '" is pending approval.',
         ];

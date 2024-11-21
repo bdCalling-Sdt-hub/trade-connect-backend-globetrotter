@@ -27,6 +27,10 @@ class OrderDeliveryRequestNotification extends Notification
     {
         return [
             'order_id' => $this->order->id,
+            'user_id' =>$this->order->user_id,
+            'image' => $this->order->user->image
+                    ? url('profile/',$this->order->user->image)
+                    : url('avatar/profile.png'),
             'status' => 'deliveryRequest',
             'message' => "{$this->order->product->product_name} is ready for delivery.",
         ];

@@ -109,7 +109,7 @@ class AuthController extends Controller
         $user->balance += $request->input('amount');
         $user->save();
         $amount = $request->amount;
-        $user->notify(new BalanceUpdated($amount, 'increase'));
+        $user->notify(new BalanceUpdated($user, $amount, 'increase'));
         return response()->json([
             'message' => 'Balance increased successfully.',
             'balance' => $user->balance
@@ -127,7 +127,7 @@ class AuthController extends Controller
         $user->balance -= $request->input('amount');
         $user->save();
         $amount = $request->amount;
-        $user->notify(new BalanceUpdated($amount, 'decrease'));
+        $user->notify(new BalanceUpdated($user,$amount, 'decrease'));
         return response()->json([
             'message' => 'Balance decreased successfully.',
             'balance' => $user->balance
@@ -405,10 +405,11 @@ class AuthController extends Controller
     }
     public function getProfile(Request $request)
     {
-        $user = JWTAuth::parseToken()->authenticate();
+        $user = Auth::user();
         if (!$user) {
             return response()->json(['error' => 'User not found'], 404);
         }
+        $shop = Shop::where('user_id', $user->id)->first();
         $imageUrl = $user->image ? url('profile/' . $user->image) : url('avatar/profile.png');
         $profileData = [
             'id'=> $user->id,
@@ -425,6 +426,20 @@ class AuthController extends Controller
             'status' => true,
             'message' => 'User profile fetched successfully.',
             'data' => $profileData,
+            'shop' => $shop ? [
+                'shop_name' => $shop->shop_name,
+                'logo' => $shop->logo
+                        ? url('logos/',$shop->logo)
+                        : url('avatar/logo.png'),
+                'seller' => [
+                    'seller_name' => $shop->user->full_name,
+                    'user_name' => $shop->user->user_name,
+                    'email' => $shop->user->email,
+                    'image' =>$shop->user->image
+                        ? url('profile/',$shop->user->image)
+                        : url('avatar/profile.png')
+                ],
+            ] : [],
         ], 200);
     }
     public function profile(Request $request)
@@ -602,42 +617,5 @@ class AuthController extends Controller
         ];
         return $this->sendResponse($response, 'User products retrieved successfully.');
     }
-    // private function getCurrentYearOrderActivities()
-    // {
-    //     $currentYear = now()->year;
-    //     $user = Auth::user();
-    //     $purchaseOrders = Order::where('user_id', $user->id)
-    //         ->where('status', 'acceptDelivery')
-    //         ->whereYear('created_at', $currentYear)
-    //         ->get()
-    //         ->groupBy(function ($order) {
-    //             return Carbon::parse($order->created_at)->format('m');
-    //         });
-    //     $salesOrders = Order::whereHas('product', function ($query) use ($user) {
-    //             $query->where('user_id', $user->id); // Match product user_id with auth user ID
-    //         })
-    //         ->where('status', 'acceptDelivery')
-    //         ->whereYear('created_at', $currentYear)
-    //         ->get()
-    //         ->groupBy(function ($order) {
-    //             return Carbon::parse($order->created_at)->format('m'); // Group by month
-    //         });
-    //     // Prepare the monthly data
-    //     $monthlyData = [];
-    //     $monthNames = [
-    //         1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
-    //         7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
-    //     ];
-    //     for ($month = 1; $month <= 12; $month++) {
-    //         $monthKey = str_pad($month, 2, '0', STR_PAD_LEFT); // Ensure 2-digit format
-    //         $monthlyData[$monthNames[$month]] = [
-    //             'purchaseOrders' => isset($purchaseOrders[$monthKey]) ? $purchaseOrders[$monthKey]->count() : 0,
-    //             'salesOrders' => isset($salesOrders[$monthKey]) ? $salesOrders[$monthKey]->count() : 0,
-    //         ];
-    //     }
-    //     return [
-    //         'year' => $currentYear,
-    //         'monthlyActivities' => $monthlyData,
-    //     ];
-    // }
+
 }

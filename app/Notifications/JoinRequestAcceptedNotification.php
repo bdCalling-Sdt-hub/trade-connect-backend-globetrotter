@@ -31,6 +31,9 @@ class JoinRequestAcceptedNotification extends Notification
             'message' => "{$this->user->name} has requested to join your group {$this->group->name}.",
             'group_id' => $this->group->id,
             'user_id' => $this->user->id,
+            'image' => $this->user->image
+                    ? url('profile/',$this->user->image)
+                    : url('avatar/profile.png'),
         ];
     }
 }

@@ -36,6 +36,9 @@ class NewsFeedNotification extends Notification
         return [
             'news_feed_id' => $this->newsFeedData->id,
             'user_id' => $this->newsFeedData->user_id,
+            'image' =>  $this->newsFeedData->user->image
+                    ? url('profile/', $this->newsFeedData->user->image)
+                    : url('avatar/profile.png'),
             'message' => 'A new news feed has been created.',
             'content' => $this->newsFeedData->share_your_thoughts,
             'created_at' => $this->newsFeedData->created_at,
