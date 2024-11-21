@@ -85,6 +85,7 @@ class SearchController extends Controller
         return $products->map(function ($product) {
             return [
                 'id' => $product->id,
+                'user_id' => $product->user_id,
                 'full_name' => $product->user->full_name,
                 'user_name' => $product->user->user_name,
                 'image' => $product->user->image ? url('profile/', $product->user->image) : url('avatar/profile.png'),

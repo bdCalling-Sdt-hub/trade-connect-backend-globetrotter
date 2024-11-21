@@ -25,6 +25,10 @@ class OrderAcceptedNotification extends Notification
     {
         return [
             'order_id' => $this->order->id,
+            'user_id' =>$this->order->user_id,
+            'image' => $this->order->user->image
+                    ? url('profile/',$this->order->user->image)
+                    : url('avatar/profile.png'),
             'status' => 'accepted',
             'message' => "Your order has been accepted.",
         ];

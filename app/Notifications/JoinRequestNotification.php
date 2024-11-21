@@ -36,7 +36,10 @@ class JoinRequestNotification extends Notification
         return [
             'group_id' => $this->joinRequest['group_id'],
             'user_id' => $this->joinRequest['user_id'],
-            'message' => $this->joinRequest['user_id'] . ' has requested to join ' . $this->joinRequest['group_id'],
+            'image' => $this->joinRequest->user->image
+                    ? url('profile/',$this->joinRequest->user->image)
+                    : url('avatar/profile.png'),
+            'message' => $this->joinRequest->user->full_name . ' has requested to join ' . $this->joinRequest->group->name,
         ];
     }
 }

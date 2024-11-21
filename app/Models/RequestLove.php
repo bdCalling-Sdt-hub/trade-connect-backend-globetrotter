@@ -18,4 +18,8 @@ class RequestLove extends Model
     {
         return $this->belongsTo(User::class,"request_id");
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

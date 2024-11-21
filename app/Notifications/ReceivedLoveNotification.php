@@ -12,15 +12,17 @@ class ReceivedLoveNotification extends Notification
     use Queueable;
 
     public $wallet;
+    public  $receivedUser;
 
-    public function __construct($wallet)
+    public function __construct($wallet,  $receivedUser)
     {
         $this->wallet = $wallet;
+        $this->receivedUser =  $receivedUser;
     }
 
     public function via($notifiable)
     {
-        return ['database']; 
+        return ['database'];
     }
     public function toArray($notifiable)
     {
@@ -28,6 +30,10 @@ class ReceivedLoveNotification extends Notification
             'message' => 'You have received love.',
             'total_love' => $this->wallet->total_love,
             'wallet_id' => $this->wallet->id,
+            'user_id'=> $this->receivedUser->id,
+            'image' => $this->receivedUser->image
+                    ? url('profile/',$this->receivedUser->image)
+                    : url('avatar/profile.png'),
         ];
     }
 }

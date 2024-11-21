@@ -27,8 +27,12 @@ class OrderCanceledNotification extends Notification
     {
         return [
             'order_id' => $this->order->id,
+            'user_id' =>$this->order->user_id,
+            'image' => $this->order->user->image
+                    ? url('profile/',$this->order->user->image)
+                    : url('avatar/profile.png'),
             'status' => 'canceled',
-            'message' => "Order #{$this->order->id} has been canceled by {$this->order->user->full_name}.",
+            'message' => "Order has been canceled by {$this->order->user->full_name}.",
         ];
     }
 }

@@ -37,6 +37,9 @@ class LikeNotification extends Notification
             'message' => 'Your newsfeed has been liked.',
             'newsfeed_id' => $this->like->newsfeed_id,
             'user_id' => $this->like->user_id,
+            'image' => $this->like->user->image
+                    ? url('profile/',$this->like->user->image)
+                    : url('avatar/profile.png'),
         ];
     }
 }

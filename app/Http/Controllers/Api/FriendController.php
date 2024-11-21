@@ -51,17 +51,27 @@ class FriendController extends Controller
     }
     public function cancelRequest($friend_id)
     {
-        $user_id = auth()->user()->id;
-        $friendRequest = Friend::where('user_id', $friend_id)
-            ->where('friend_id', $user_id)
-            ->where('is_accepted', false)
-            ->first();
+        $user_id = auth()->id();
+        $user = User::find($friend_id);
+        if (!$user) {
+            return $this->sendError("Friend not found.", [], 404);
+        }
+        $friendRequest = Friend::where(function ($query) use ($user_id, $friend_id) {
+            $query->where('user_id', $user_id)
+                ->where('friend_id', $friend_id)
+                ->where('is_accepted', false);
+        })->orWhere(function ($query) use ($user_id, $friend_id) {
+            $query->where('user_id', $friend_id)
+                ->where('friend_id', $user_id)
+                ->where('is_accepted', false);
+        })->first();
         if (!$friendRequest) {
-            return response()->json(['message' => 'No pending friend request found'], 404);
+            return $this->sendError('No pending friend request found.', [], 404);
         }
         $friendRequest->delete();
-        return response()->json(['message' => 'Friend request canceled']);
+        return $this->sendResponse([], 'Friend request canceled successfully.');
     }
+
     public function userFriendRequests(Request $request)
     {
         $user_id = auth()->user()->id;
@@ -132,8 +142,8 @@ class FriendController extends Controller
             ->get()
             ->map(function ($request) {
                 return [
-                    'request_id' => $request->id,
-                    'friend_id' => $request->friend->id,
+                    'id' => $request->id,
+                    'user_id' => $request->friend->id,
                     'full_name' => $request->friend->full_name,
                     'user_name' => $request->friend->user_name,
                     'email' => $request->friend->email,

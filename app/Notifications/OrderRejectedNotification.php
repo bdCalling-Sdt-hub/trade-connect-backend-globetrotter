@@ -29,13 +29,10 @@ class OrderRejectedNotification extends Notification
             'order_id' => $this->order->id,
             'status' => 'rejectDelivery',
             'message' => "{$user->full_name} has rejected the delivery.",
-            'user' => [
-                'id' => $user->id,
-                'full_name' => $user->full_name,
-                'user_name' => $user->user_name,
-                'email' => $user->email,
-                'image' => $user->image ? url('profile/', $user->image) : url('avatar/profile.png'),
-            ]
+            'user_id' =>$this->order->user_id,
+            'image' => $this->order->user->image
+                    ? url('profile/',$this->order->user->image)
+                    : url('avatar/profile.png'),
         ];
     }
 }

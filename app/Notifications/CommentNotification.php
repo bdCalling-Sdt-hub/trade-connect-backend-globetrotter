@@ -36,6 +36,9 @@ class CommentNotification extends Notification
             'comment_id' => $this->comment->id,
             'newsfeed_id' => $this->comment->newsfeed_id,
             'user_id' => $this->comment->user_id,
+            'image' => $this->comment->user->image
+                    ? url('profile/',$this->comment->user->image)
+                    : url('avatar/profile.png'),
             'message' => 'A new comment has been made on your news feed.',
             'content' => $this->comment->comments,
         ];
