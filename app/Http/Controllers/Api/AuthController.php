@@ -421,11 +421,6 @@ class AuthController extends Controller
             'privicy'=>$user->privacy ??'',
             'location' => $user->location,
             'image' => $imageUrl,
-        ];
-        return response()->json([
-            'status' => true,
-            'message' => 'User profile fetched successfully.',
-            'data' => $profileData,
             'shop' => $shop ? [
                 'shop_name' => $shop->shop_name,
                 'logo' => $shop->logo
@@ -439,7 +434,13 @@ class AuthController extends Controller
                         ? url('profile/',$shop->user->image)
                         : url('avatar/profile.png')
                 ],
-            ] : [],
+            ] : null,
+        ];
+        return response()->json([
+            'status' => true,
+            'message' => 'User profile fetched successfully.',
+            'data' => $profileData,
+
         ], 200);
     }
     public function profile(Request $request)
