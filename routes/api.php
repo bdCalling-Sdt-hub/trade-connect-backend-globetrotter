@@ -185,7 +185,8 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::get('getpersonalInformation', [SettingController::class,'getPersonalInformation'])->middleware('admin');
     Route::apiResource('faqs',FaqController::class)->middleware('member');
     Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('admin')
-    ->only(['index','store','update','destroy']);
+    ->only(['index','destroy']);
+    Route::post('terms-and-conditions',[TermAndConditioncontroller::class,'termAndConditions'])->middleware('admin');
     Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('member')
     ->only(['index']);
 });

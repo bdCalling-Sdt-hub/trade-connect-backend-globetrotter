@@ -226,7 +226,7 @@ class AuthController extends Controller
         $otp = rand(100000, 999999);
         $user->update([
             'otp' => $otp,
-            'otp_expires_at' => now()->addMinutes(10),
+            'otp_expires_at' => now()->addMinutes(1),
             'verify_email' => 0
         ]);
         $emailData = [
@@ -420,6 +420,7 @@ class AuthController extends Controller
             'bio'=> $user->bio ?? '',
             'privicy'=>$user->privacy ??'',
             'location' => $user->location,
+            'contact' => $user->contact,
             'image' => $imageUrl,
             'shop' => $shop ? [
                 'shop_name' => $shop->shop_name,
@@ -450,10 +451,11 @@ class AuthController extends Controller
             return $this->sendError([],"You are not user.");
         }
         $validator = Validator::make($request->all(), [
-            'full_name' => 'nullable|required|string|max:255',
+            'full_name' => 'nullable|string|max:255',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
-            'location' => 'nullable|required|string|max:255',
-            'bio' => 'nullable|required|string|max:255',
+            'location' => 'nullable|string|max:255',
+            'bio' => 'nullable|string|max:255',
+            'contact' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -474,6 +476,7 @@ class AuthController extends Controller
         $user->image = $fileName ?? $user->image;
         $user->location = $request->location ?? $user->location;
         $user->bio = $request->bio ?? $user->bio;
+        $user->contact = $request->contact ?? $user->contact;
         $user->save();
         return $this->sendResponse($user, 'Profile updated successfully.');
     }

@@ -49,7 +49,20 @@ class ProfileController extends Controller
         $anotherUser = User::findOrFail($id);
 
         if ($anotherUser->privacy === 'private' && $anotherUser->id !== $user->id) {
-            return $this->sendError('No available data found', 403);
+            $imageUrl = $user->image ? url('profile/' . $user->image) : url('avatar/profile.png');
+            $profileData = [
+                'id'=> $user->id,
+                'full_name' => $user->full_name,
+                'user_name' => $user->user_name,
+                'email'=> $user->email,
+                'balance'=>$user->balance,
+                'bio'=> $user->bio ?? '',
+                'privicy'=>$user->privacy ??'',
+                'location' => $user->location,
+                'contact' => $user->contact,
+                'image' => $imageUrl,
+            ];
+            return $this->sendResponse($profileData,'Profile is Private.');
         }
         if ($anotherUser->privacy === 'friends') {
             $isFriend = Friend::where('is_accepted', true)
@@ -61,7 +74,20 @@ class ProfileController extends Controller
                 })->exists();
 
             if (!$isFriend && $anotherUser->id !== $user->id) {
-                return $this->sendError('No available data found', 403);
+                $imageUrl = $user->image ? url('profile/' . $user->image) : url('avatar/profile.png');
+                $profileData = [
+                    'id'=> $user->id,
+                    'full_name' => $user->full_name,
+                    'user_name' => $user->user_name,
+                    'email'=> $user->email,
+                    'balance'=>$user->balance,
+                    'bio'=> $user->bio ?? '',
+                    'privicy'=>$user->privacy ??'',
+                    'location' => $user->location,
+                    'contact' => $user->contact,
+                    'image' => $imageUrl,
+                ];
+                return $this->sendResponse($profileData,'You are not friend.');
             }
         }
         return $this->formatUserProfile($anotherUser, $request);
@@ -188,6 +214,7 @@ class ProfileController extends Controller
             'id'            => $user->id,
             'full_name'     => $user->full_name,
             'user_name'     => $user->user_name,
+            'contact'       => $user->contact,
             'bio'           => $user->bio,
             'privacy'       => $user->privacy,
             'email'         => $user->email,

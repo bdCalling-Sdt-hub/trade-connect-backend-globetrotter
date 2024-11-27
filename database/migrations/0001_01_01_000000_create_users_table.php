@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('balance',10,2)->default(0);
             $table->string('address')->nullable();
             $table->string('location')->nullable();
+            $table->string('contact')->nullable();
             $table->string('bio')->nullable();
             $table->boolean('verify_email');
             $table->string('verification_token')->nullable();

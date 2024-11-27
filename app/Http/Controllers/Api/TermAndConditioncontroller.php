@@ -13,13 +13,14 @@ class TermAndConditioncontroller extends Controller
     {
         $termAndCondition = TermAndCondition::where('status',1)->first();
         if (!$termAndCondition) {
-            return $this->sendError("No Term and Condition Found.");
+            $data = "No Term and Conditions Found.";
+            return $this->sendResponse($data,"No Term and Condition Found.");
         }
-        return $this->sendResponse($termAndCondition, 'Term and condition retrieved successfully.');
+        return $this->sendResponse($termAndCondition, 'Term and conditions retrieved successfully.');
     }
-    public function update(Request $request, $id)
+    public function termAndConditions(Request $request)
     {
-        $terms = TermAndCondition::find($id);
+        $terms = TermAndCondition::first();
         if (!$terms) {
             $validator = Validator::make($request->all(), [
                 'content' => 'required|string',
@@ -28,11 +29,11 @@ class TermAndConditioncontroller extends Controller
             if ($validator->fails()) {
                 return $this->sendError('Validation error.', $validator->errors(), 400);
             }
-            TermAndCondition::create([
+           $data = TermAndCondition::create([
                 'content' => $request->content,
                 'status' => $request->status ?? $terms->status,
             ]);
-            return $this->sendResponse($terms, 'Terms and conditions created successfully.');
+            return $this->sendResponse($data, 'Terms and conditions created successfully.');
         }
         $validator = Validator::make($request->all(), [
             'content' => 'required|string',

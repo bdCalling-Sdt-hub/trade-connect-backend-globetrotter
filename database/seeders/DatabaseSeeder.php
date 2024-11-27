@@ -55,5 +55,16 @@ class DatabaseSeeder extends Seeder
         'role'=>'MEMBER',
         'status'=>'active'
        ]);
+       User::create([
+        'id'=>5,
+        'full_name'=>"Arif Biswas",
+        'user_name'=>"arifbiswas",
+        'email'=>"mailto:arifbiswas1020@gmail.com",
+        'password'=>Hash::make(12345678),
+        'verify_email'=>1,
+        'role'=>'MEMBER',
+        'status'=>'active'
+       ]);
+
     }
 }
