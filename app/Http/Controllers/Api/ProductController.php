@@ -335,6 +335,7 @@ class ProductController extends Controller
                 'user_name' => $product->user->user_name,
                 'image' => $product->user->image ? url('profile/', $product->user->image) : url('profile/profile.png'),
                 'product_name' => $product->product_name,
+                'status' => $product->status,
                 'category_name' => $product->category->category_name,
                 'product_code' => $product->product_code,
                 'price' => $product->price,

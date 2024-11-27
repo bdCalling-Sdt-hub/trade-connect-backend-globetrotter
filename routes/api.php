@@ -110,7 +110,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
     Route::delete('leave-group', [GroupController::class, 'leaveGroup']);
     Route::post('send-group-messages', [GroupController::class, 'sendGroupMessage']);
     Route::get('get-group-messages', [GroupController::class, 'getMessages']);
-    Route::put('group-messages-read', [GroupController::class, 'markMessageAsRead']);
+    Route::put('group-messages-read', [GroupController::class, 'markGroupMessagesAsRead']);
     Route::delete('group-messages/{messageId}', [GroupController::class, 'deleteMessage']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
@@ -185,7 +185,8 @@ Route::middleware(['api', 'jwt.auth'])->group(function () {
     Route::get('getpersonalInformation', [SettingController::class,'getPersonalInformation'])->middleware('admin');
     Route::apiResource('faqs',FaqController::class)->middleware('member');
     Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('admin')
-    ->only(['index','store','update','destroy']);
+    ->only(['index','destroy']);
+    Route::post('terms-and-conditions',[TermAndConditioncontroller::class,'termAndConditions'])->middleware('admin');
     Route::apiResource('terms-and-conditions',TermAndConditioncontroller::class)->middleware('member')
     ->only(['index']);
 });

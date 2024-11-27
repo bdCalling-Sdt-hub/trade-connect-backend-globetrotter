@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('group_id');
             $table->foreignId('sender_id');
-            $table->text('message');
+            $table->text('message')->nullable();
             $table->json('images')->nullable();
             $table->boolean('is_read')->default(false);
             $table->json('read_by')->nullable();

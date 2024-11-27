@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('sender_id');
             $table->foreignId('receiver_id');
-            $table->text('message');
+            $table->text('message')->nullable();
             $table->json('images')->nullable();
             $table->boolean('is_read')->nullable();
             $table->timestamps();

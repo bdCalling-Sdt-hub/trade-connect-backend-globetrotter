@@ -70,8 +70,8 @@ class MessageController extends Controller
     {
         $validator =Validator::make($request->all(),[
             'receiver_id' => 'required|exists:users,id',
-            'message' => 'required|string',
-            'image' => 'nullable|image|max:2048',
+            'images'=>'nullable|array|max:9',
+            'images*' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
         ]);
         if($validator->fails()){
             return $this->sendError("Validation Error",$validator->errors(),422);
@@ -167,6 +167,7 @@ public function destroy($id)
                 'id' => $user->id,
                 'full_name' => $user->full_name,
                 'user_name' => $user->user_name,
+                'location' => $user->location,
                 'email' => $user->email,
                 'image' => $user->image ? url('profile/', $user->image) : url('avatar/', 'profile.png'),
                 'last_message' => $lastMessage ? $lastMessage->message : null,

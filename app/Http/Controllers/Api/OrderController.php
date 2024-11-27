@@ -10,6 +10,7 @@ use App\Notifications\OrderCanceledNotification;
 use App\Notifications\OrderDeliveryRequestNotification;
 use App\Notifications\OrderNotification;
 use App\Notifications\OrderRejectedNotification;
+use Auth;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -26,7 +27,6 @@ class OrderController extends Controller
             'zipcode' => 'nullable|string',
             'address' => 'nullable|string',
             'notes' => 'nullable|string',
-            // 'status' => 'nullable|in:pending,canceled,accepted,deliveryRequest,acceptDelivery',
         ]);
         if ($validator->fails()) {
             return response()->json(['error' => $validator->errors()], 422);
@@ -46,7 +46,6 @@ class OrderController extends Controller
                 'zipcode' => $request->zipcode,
                 'address' => $request->address,
                 'notes' => $request->notes,
-                // 'status' => $request->status,
             ]);
             $user->decrement('balance', $request->total_amount);
             $order->product->user->notify(new OrderNotification($order));
@@ -80,7 +79,11 @@ class OrderController extends Controller
                         'product_name'  => $order->product->product_name,
                         'price'         => $order->product->price,
                         'description'   => $order->product->description,
-                        'image'         => $order->product->image ? url('products/' . $order->product->image) : url('avatar/product.png'),
+                        'images'        => collect(json_decode($order->product->images))->map(function ($image) {
+                                            return $image
+                                                ? url("products/", $image)
+                                                : url('avatar/product.png');
+                        }),
                     ],
                     'notes'         => $order->notes,
                 ];
@@ -119,9 +122,13 @@ class OrderController extends Controller
     }
     public function getSellerOrder()
     {
-        $orders = Order::with(['product'])
-            ->orderBy('id', 'desc')
-            ->get()
+        $user = Auth::user();
+        $orders = Order::with(['product', 'user'])
+        ->whereHas('product', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->orderBy('id', 'desc')
+        ->get()
             ->map(function ($order) {
                 return [
                     'order_id'      => $order->id,
@@ -148,11 +155,13 @@ class OrderController extends Controller
                         'product_name'  => $order->product->product_name,
                         'price'         => $order->product->price,
                         'description'   => $order->product->description,
-                        'image'         => $order->product->image
-                            ? url('products/' . $order->product->image)
-                            : url('avatar/product.png'),
+                        'images'        => collect(json_decode($order->product->images))->map(function ($image) {
+                                        return $image
+                                            ? url("products/", $image)
+                                            : url('avatar/product.png');
+                        }),
                     ],
-                    'notes'         => $order->notes,
+                    'notes'=> $order->notes,
                 ];
             });
         if ($orders->isEmpty()) {
@@ -237,7 +246,6 @@ class OrderController extends Controller
             $productOwner = $product->user;
             $productOwner->balance += $order->product->price;
             $productOwner->save();
-
              Wallet::create([
                 "user_id" => $order->user_id,
                 "amount" => $order->total_amount,
@@ -283,8 +291,6 @@ class OrderController extends Controller
     {
         $query = Order::where('status', 'rejectDelivery')
                     ->orWhere('status', 'amountReturned');
-
-        // Apply search filter if provided
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->whereHas('user', function ($userQuery) use ($search) {
@@ -332,7 +338,6 @@ class OrderController extends Controller
                 ]
             ];
         });
-
         return response()->json([
             'data' => $rejectedOrdersData,
             'pagination' => [
@@ -345,7 +350,6 @@ class OrderController extends Controller
             'status' => 200
         ]);
     }
-
     public function returnAmount(Request $request)
     {
         $validator = Validator::make($request->all(), [

@@ -77,7 +77,7 @@
             </p>
             <p>Please use the following OTP code to proceed:</p>
             <div class="otp-code">{{ $otp['otp'] }}</div>
-            <p>This code is valid for 10 minutes. Please do not share it with anyone.</p>
+            <p>This code is valid for 1 minutes. Please do not share it with anyone.</p>
             <p>If you did not request this OTP, please ignore this email.</p>
         </div>
 
