@@ -160,6 +160,13 @@ class WalletController extends Controller
                     "payment_method" => $request->payment_method,
                     "status"=>'send'
                 ]);
+                Wallet::create([
+                    "user_id" => $requestLove->user_id,
+                    "amount" => $request->amount,
+                    "total_love" => $request->total_love,
+                    "payment_method" => $request->payment_method,
+                    "status"=>'received'
+                ]);
                 if ($wallet) {
                     $user->decrement('balance', $request->amount);
                     $requestLove->update(['status' => 'accepted']);

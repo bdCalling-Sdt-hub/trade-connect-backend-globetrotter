@@ -23,17 +23,17 @@ class NewsFeedController extends Controller
 
         $newsFeeds = NewsFeed::with(['user', 'likes', 'comments', 'comments.replies'])
         ->where(function ($query) use ($user, $friendIds) {
-            $query->where('privacy', 'public')
-                ->orWhere(function ($subQuery) use ($friendIds) {
-                    $subQuery->where('privacy', 'friends')
-                             ->whereIn('user_id', $friendIds);
-                })
-                ->orWhere(function ($subQuery) use ($user) {
-                    $subQuery->where('privacy', 'private')
-                             ->where('user_id', $user->id);
-                });
+            $query->where('privacy', 'public') // Include public posts
+                  ->orWhere(function ($subQuery) use ($friendIds) {
+                      $subQuery->where('privacy', 'friends')
+                               ->whereIn('user_id', $friendIds); // Include posts visible to friends
+                  })
+                  ->orWhere(function ($subQuery) use ($user) {
+                      $subQuery->where('privacy', 'private')
+                               ->where('user_id', $user->id); // Include posts visible to the creator
+                  });
         })
-        ->orderBy('id', 'DESC')
+        ->orderBy('id', 'DESC') // Sort posts by ID in descending order
         ->paginate($request->get('per_page', 20));
 
         $formattedNewsFeeds = $newsFeeds->getCollection()->transform(function ($newsFeed) use ($user) {
@@ -43,6 +43,7 @@ class NewsFeedController extends Controller
                 'newsfeed_id'   => $newsFeed->id,
                 'user'          => [
                     'user_id'   => $userData->id,
+                    'privacy'   =>$userData->privacy,
                     'full_name' => $userData->full_name,
                     'user_name' => $userData->user_name,
                     'image'     => $userData->image ? url('profile/',$userData->image) : url('avatar/profile.png'),

@@ -20,8 +20,9 @@ class SettingController extends Controller
         }
         $profileData = [
             'full_name' => $user->full_name,
-            'bio'=> $user->bio ?? '',
+            'bio'=> $user->bio ,
             'location' => $user->location,
+            'contact' => $user->contact,
             'image' => $user->image
                 ? url('profile/',$user->image)
                 : url('avatar/profile.png')
@@ -46,6 +47,7 @@ class SettingController extends Controller
             'old_password' => 'required|string',
             'new_password' => 'required|string|min:8',
             'confirm_password' => 'required|min:8|same:new_password',
+            'contact' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -72,6 +74,7 @@ class SettingController extends Controller
             }
             $user->password = Hash::make($request->new_password);
         }
+        $user->contact =$request->contact ?? $user->contact;
         $user->save();
         $user->makeHidden(['password', 'remember_token']);
 

@@ -12,6 +12,11 @@ class FriendController extends Controller
     public function sendRequest($friend_id)
     {
         $user_id = auth()->user()->id;
+        $user = User::find($friend_id);
+        if(!$user)
+        {
+            return $this->sendError("No user found.");
+        }
         if (Friend::where('user_id', $user_id)->where('friend_id', $friend_id)->exists()) {
             return response()->json(['message' => 'Friend request already sent'], 400);
         }
@@ -154,11 +159,7 @@ class FriendController extends Controller
                 ];
             });
         if ($outgoingRequests->isEmpty()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'No outgoing friend requests found.',
-                'data' => [],
-            ], 404);
+            $this->sendResponse([],"No outgoing friend requests found.");
         }
 
         return response()->json([

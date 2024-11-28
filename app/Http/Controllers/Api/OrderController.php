@@ -272,12 +272,10 @@ class OrderController extends Controller
             if (!$order) {
                 return response()->json(['message' => 'Order not found.'], 404);
             }
-            if ($order->status == 'rejectDelivery') {
+            if ($order->status == 'rejectDelivery' || $order->status=='canceled') {
                 return response()->json(['message' => 'This order has already been rejected.'], 200);
             }
-            if ($order->status !== 'deliveryRequest') {
-                return response()->json(['message' => 'Only orders with a delivery request can be rejected.'], 400);
-            }
+          
             $order->status = 'rejectDelivery';
             $order->save();
             $order->product->user->notify(new OrderRejectedNotification($order));
