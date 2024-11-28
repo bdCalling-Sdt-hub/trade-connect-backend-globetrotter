@@ -48,18 +48,18 @@ class ProfileController extends Controller
         $user = Auth::user();
         $anotherUser = User::findOrFail($id);
 
-        if ($anotherUser->privacy === 'private' && $anotherUser->id !== $user->id) {
-            $imageUrl = $user->image ? url('profile/' . $user->image) : url('avatar/profile.png');
+        if ($anotherUser->privacy === 'private' || $anotherUser->id == $user->id) {
+            $imageUrl = $anotherUser->image ? url('profile/' . $anotherUser->image) : url('avatar/profile.png');
             $profileData = [
-                'id'=> $user->id,
-                'full_name' => $user->full_name,
-                'user_name' => $user->user_name,
-                'email'=> $user->email,
-                'balance'=>$user->balance,
-                'bio'=> $user->bio ?? '',
-                'privicy'=>$user->privacy ??'',
-                'location' => $user->location,
-                'contact' => $user->contact,
+                'id'=> $anotherUser->id,
+                'full_name' => $anotherUser->full_name,
+                'user_name' => $anotherUser->user_name,
+                'email'=> $anotherUser->email,
+                'balance'=>$anotherUser->balance,
+                'bio'=> $anotherUser->bio ?? '',
+                'privacy'=>$anotherUser->privacy ??'',
+                'location' => $anotherUser->location,
+                'contact' => $anotherUser->contact,
                 'image' => $imageUrl,
             ];
             return $this->sendResponse($profileData,'Profile is Private.');

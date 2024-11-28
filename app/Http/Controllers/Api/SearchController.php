@@ -112,7 +112,8 @@ class SearchController extends Controller
     }
     private function people(string $query)
     {
-        $users = User::where('user_name', 'like', '%' . $query . '%')->get();
+        $users = User::where('user_name', 'like', '%' . $query . '%')
+                ->orWhere('full_name','like','%'.$query. '%')->get();
 
         return $users->map(function ($user) {
             return [

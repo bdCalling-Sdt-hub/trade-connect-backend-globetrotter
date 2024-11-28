@@ -37,8 +37,18 @@ class ProductController extends Controller
     {
         try {
             $products = Product::with(['shop.user', 'category'])
-                ->where('status', 'approved')
-                ->get();
+            ->where('status', 'approved')
+            ->where(function ($query) {
+                $query->whereHas('shop.user', function ($q) {
+                    $q->where('privacy', 'public'); // Show public products
+                })
+                ->orWhereHas('shop.user', function ($q) {
+                    $q->where('privacy', 'friends'); // Show friends' products
+                });
+            })
+            ->orderBy('id','desc')
+            ->paginate(20);
+
             $products = $products->map(function ($product) {
                 return [
                     'id' => $product->id,
