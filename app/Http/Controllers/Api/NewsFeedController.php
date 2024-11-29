@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Friend;
 use App\Models\NewsFeed;
 use App\Models\User;
 use App\Notifications\NewsFeedNotification;
@@ -19,22 +20,10 @@ class NewsFeedController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $friendIds = $user->friends()->pluck('friends.friend_id')->toArray();
-
-        $newsFeeds = NewsFeed::with(['user', 'likes', 'comments', 'comments.replies'])
-        ->where(function ($query) use ($user, $friendIds) {
-            $query->where('privacy', 'public')
-                ->orWhere(function ($subQuery) use ($friendIds) {
-                    $subQuery->where('privacy', 'friends')
-                             ->whereIn('user_id', $friendIds);
-                })
-                ->orWhere(function ($subQuery) use ($user) {
-                    $subQuery->where('privacy', 'private')
-                             ->where('user_id', $user->id);
-                });
-        })
-        ->orderBy('id', 'DESC')
-        ->paginate($request->get('per_page', 20));
+        // $friendIds = $user->friends()->pluck('friends.friend_id')->toArray();
+        // $authUserId = Auth::user()->id;
+        $newsFeedsQuery =NewsFeed::with(['user', 'likes', 'comments', 'comments.replies'])->orderBy('id', 'DESC');
+        $newsFeeds = $newsFeedsQuery->paginate($request->get('per_page', 20));
 
         $formattedNewsFeeds = $newsFeeds->getCollection()->transform(function ($newsFeed) use ($user) {
             $userData = $newsFeed->user;
@@ -115,7 +104,6 @@ class NewsFeedController extends Controller
             return 'right now'; // If the comment was created less than a minute ago
         }
     }
-
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
