@@ -77,10 +77,25 @@ class SearchController extends Controller
             ];
         })->toArray();
     }
-
     private function product(string $query)
     {
-        $products = Product::where('status', 'approved')->where('product_name', 'like', '%' . $query . '%')->get();
+        $authUserId = Auth::user()->id;
+        $products = Product::where('status', 'approved')
+                            ->where('product_name', 'like', '%' . $query . '%')
+                            ->whereHas('user', function ($query) use ($authUserId) {
+                                $query->where(function ($query) use ($authUserId) {
+                                    $query->where('privacy', 'public') // Include public products
+                                        ->orWhere(function ($query) use ($authUserId) {
+                                            $query->where('privacy', 'friends') // Include friends-only products
+                                                ->whereHas('friends', function ($friendQuery) use ($authUserId) {
+                                                    $friendQuery->where('friend_id', $authUserId)
+                                                        ->where('is_accepted', true); // Check accepted friendship
+                                                });
+                                        });
+                                });
+                            })
+                            ->orderBy('id','desc')
+                            ->paginate(20);
 
         return $products->map(function ($product) {
             return [

@@ -33,4 +33,9 @@ class Product extends Model
     {
         return $this->belongsTo(User::class); // Assuming each product belongs to a user
     }
+    public function friends()
+    {
+        return $this->hasMany(Friend::class, 'user_id');
+    }
+
 }

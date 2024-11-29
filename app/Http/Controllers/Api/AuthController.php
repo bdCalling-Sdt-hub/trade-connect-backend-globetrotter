@@ -418,7 +418,7 @@ class AuthController extends Controller
             'email'=> $user->email,
             'balance'=>$user->balance,
             'bio'=> $user->bio ?? '',
-            'privicy'=>$user->privacy ??'',
+            'privacy'=>$user->privacy ??'',
             'location' => $user->location,
             'contact' => $user->contact,
             'image' => $imageUrl,

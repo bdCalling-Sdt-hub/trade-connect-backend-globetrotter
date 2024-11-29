@@ -110,11 +110,11 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(NewsFeed::class, 'user_id');
     }
-    public function friends()
-    {
-        return $this->belongsToMany(User::class, 'friends', 'user_id', 'friend_id')
-                    ->wherePivot('is_accepted', true);
-    }
+    // public function friends()
+    // {
+    //     return $this->belongsToMany(User::class, 'friends', 'user_id', 'friend_id')
+    //                 ->wherePivot('is_accepted', true);
+    // }
     public function friendRequests()
     {
         return $this->hasMany(Friend::class, 'friend_id')->where('is_accepted', false);
@@ -136,7 +136,11 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasOne(Shop::class); // One-to-one relationship between User and Shop
     }
 
-
+    public function friends()
+    {
+        return $this->hasMany(Friend::class, 'user_id', 'id')
+                    ->where('is_accepted', true); // Ensure only accepted friendships
+    }
 
 
 }

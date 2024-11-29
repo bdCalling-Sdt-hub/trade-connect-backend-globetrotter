@@ -15,7 +15,7 @@ use App\Http\Controllers\Api\StripeController;
 use App\Http\Controllers\Api\SupportController;
 use App\Http\Controllers\Api\WalletController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\AuthController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\DashboardController;

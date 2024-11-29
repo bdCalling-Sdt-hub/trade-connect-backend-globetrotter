@@ -29,6 +29,12 @@ class NewsFeed extends Model
     {
         return $this->hasMany(Like::class, 'newsfeed_id');
     }
+    public function friends()
+    {
+        return $this->hasMany(Friend::class, 'user_id')
+                    ->orWhere('friend_id', $this->id);
+    }
+
 
 
 }
