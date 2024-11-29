@@ -47,9 +47,14 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
         $anotherUser = User::findOrFail($id);
-
-        if ($anotherUser->privacy === 'private' || $anotherUser->id == $user->id) {
-            $imageUrl = $anotherUser->image ? url('profile/' . $anotherUser->image) : url('avatar/profile.png');
+        if(!$anotherUser)
+        {
+            $this->sendError("No user found.");
+        }
+        if ($anotherUser->privacy === 'private') {
+            $imageUrl = $anotherUser->image
+                        ? url('profile/' . $anotherUser->image)
+                        : url('avatar/profile.png');
             $profileData = [
                 'id'=> $anotherUser->id,
                 'full_name' => $anotherUser->full_name,
@@ -64,37 +69,10 @@ class ProfileController extends Controller
             ];
             return $this->sendResponse($profileData,'Profile is Private.');
         }
-        if ($anotherUser->privacy === 'friends') {
-            $isFriend = Friend::where('is_accepted', true)
-                ->where(function ($query) use ($user, $anotherUser) {
-                    $query->where('user_id', $user->id)
-                          ->where('friend_id', $anotherUser->id)
-                          ->orWhere('user_id', $anotherUser->id)
-                          ->where('friend_id', $user->id);
-                })->exists();
-
-            if (!$isFriend && $anotherUser->id !== $user->id) {
-                $imageUrl = $user->image ? url('profile/' . $user->image) : url('avatar/profile.png');
-                $profileData = [
-                    'id'=> $user->id,
-                    'full_name' => $user->full_name,
-                    'user_name' => $user->user_name,
-                    'email'=> $user->email,
-                    'balance'=>$user->balance,
-                    'bio'=> $user->bio ?? '',
-                    'privicy'=>$user->privacy ??'',
-                    'location' => $user->location,
-                    'contact' => $user->contact,
-                    'image' => $imageUrl,
-                ];
-                return $this->sendResponse($profileData,'You are not friend.');
-            }
-        }
         return $this->formatUserProfile($anotherUser, $request);
     }
     private function formatUserProfile($user, Request $request)
     {
-        $privacyFilter = $request->input('privacy', null);
         $user->load('friends', 'newsFeeds.likes', 'newsFeeds.comments.replies', 'newsFeeds.comments.user', 'products.shop', 'products.category');
 
         $friendsCount = Friend::where('is_accepted', true)
@@ -103,22 +81,22 @@ class ProfileController extends Controller
                     ->orWhere('friend_id', $user->id);
             })
             ->count();
+        $authUserId = Auth::user()->id;
         $newsFeedsQuery = $user->newsFeeds()->orderBy('id', 'DESC');
-        if ($privacyFilter) {
-            if ($privacyFilter === 'friends') {
-                $friendIds = Friend::where('is_accepted', true)
-                    ->where(function ($query) use ($user) {
-                        $query->where('user_id', $user->id)
-                            ->orWhere('friend_id', $user->id);
-                    })
-                    ->pluck('user_id', 'friend_id')
-                    ->flatten()
-                    ->toArray();
+        if ($user->privacy === 'friends') {
+            $friendIds = Friend::where('is_accepted', true)
+            ->where(function ($query) use ($authUserId) {
+                $query->where('user_id', $authUserId)
+                      ->orWhere('friend_id', $authUserId);
+            })
+            ->pluck('user_id', 'friend_id')
+            ->keys()
+            ->unique()
+            ->toArray();
 
-                $newsFeedsQuery->whereIn('user_id', $friendIds);
-            } else {
-                $newsFeedsQuery->where('privacy', $privacyFilter);
-            }
+            $newsFeedsQuery->whereIn('user_id', $friendIds);
+        } elseif ($user->privacy === 'public') {
+            $newsFeedsQuery->where('privacy', 'public');
         }
         $newsFeeds = $newsFeedsQuery->get();
         $formattedNewsFeeds = $newsFeeds->map(function ($newsFeed) use ($user) {
@@ -126,7 +104,6 @@ class ProfileController extends Controller
             return [
                 'id'          => $newsFeed->id,
                 'content'     => $newsFeed->share_your_thoughts,
-                'privacy'     => $newsFeed->privacy,
                 'image_count' => count($decodedImages),
                 'images'      => collect(json_decode($newsFeed->images))->map(function ($image) {
                                         return [
@@ -138,7 +115,8 @@ class ProfileController extends Controller
                     'id'=> $newsFeed->user->id ?? '',
                     'full_name'=> $newsFeed->user->full_name ?? '',
                     'user_name'=> $newsFeed->user->user_name ?? '',
-                    'email'=> $newsFeed->user->email ?? '',
+                    'privacy'=> $newsFeed->user->privacy ?? '',
+                    'email'=> $newsFeed->user->email ,
                     'image'=> $newsFeed->user->image
                         ? url('profile/',$newsFeed->user->image)
                         : url('avatar/profile.png'),
@@ -214,9 +192,9 @@ class ProfileController extends Controller
             'id'            => $user->id,
             'full_name'     => $user->full_name,
             'user_name'     => $user->user_name,
+            'privacy'       =>$user->privacy,
             'contact'       => $user->contact,
             'bio'           => $user->bio,
-            'privacy'       => $user->privacy,
             'email'         => $user->email,
             'image'         => $user->image
                             ? url('profile/',$user->image)
