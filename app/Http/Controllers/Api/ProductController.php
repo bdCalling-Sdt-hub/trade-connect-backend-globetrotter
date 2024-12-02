@@ -370,6 +370,6 @@ class ProductController extends Controller
                 ],
             ];
         });
-        return $this->sendResponse($formattedProducts, 'Approved products retrieved successfully.');
+        return $this->sendResponse($formattedProducts, 'Products retrieved successfully.');
     }
 }

@@ -25,7 +25,7 @@ class CommentController extends Controller
                             ->orderBy('created_at', 'asc')
                             ->get();
         if ($comments->isEmpty()) {
-            return $this->sendError([], 'No comments found for this newsfeed.');
+            return $this->sendResponse([], 'No comments found for this newsfeed.');
         }
         $formattedComments = $comments->map(function ($comment) {
             return [
@@ -36,6 +36,7 @@ class CommentController extends Controller
                 'image' => $comment->user->image ? url('profile/' . $comment->user->image) : url('avatar/profile.png'),
                 'comment' => $comment->comments,
                 'created_at' => $comment->created_at->toDateTimeString(),
+
                 'replies' => $comment->replies->map(function ($reply) {
                     return [
                         'id' => $reply->id,

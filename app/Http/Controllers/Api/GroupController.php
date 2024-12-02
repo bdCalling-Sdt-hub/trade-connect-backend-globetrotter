@@ -395,7 +395,7 @@ class GroupController extends Controller
                     'full_name'=> $message->sender->full_name,
                     'image'=> $message->sender->image
                             ? url('profile/',$message->sender->image)
-                            : url('avatar/profiel.png'),
+                            : url('avatar/profile.png'),
                 ],
                 'message' => $message->message,
                 'images' => $images,
