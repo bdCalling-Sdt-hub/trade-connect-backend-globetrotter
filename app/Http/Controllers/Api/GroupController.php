@@ -400,7 +400,6 @@ class GroupController extends Controller
                 'message' => $message->message,
                 'images' => $images,
                 'is_read_by_user' => $isReadByUser,
-                // 'read_by' => json_decode($message->read_by, true),
                 'created_at' => $message->created_at,
             ];
         });

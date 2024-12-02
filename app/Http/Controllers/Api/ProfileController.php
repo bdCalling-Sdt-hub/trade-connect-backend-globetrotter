@@ -314,7 +314,7 @@ class ProfileController extends Controller
                 ]
             ];
         }
-        $productQuery = $user->products();
+        $productQuery = $user->products()->where('status','approved');
         if ($user->privacy === 'friends') {
             $friendIds = Friend::where('is_accepted', true)
                 ->where(function ($query) use ($authUserId) {

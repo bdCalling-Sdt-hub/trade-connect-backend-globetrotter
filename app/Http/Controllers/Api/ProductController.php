@@ -336,8 +336,6 @@ class ProductController extends Controller
                     'status' => 404
                 ], 404);
             }
-
-
         $formattedProducts = $products->map(function ($product) {
             return [
                 'id' => $product->id,

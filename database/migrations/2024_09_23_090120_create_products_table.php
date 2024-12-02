@@ -18,10 +18,10 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
             $table->string('product_name');
             $table->double('price', 10, 2)->default(0.00);
-            $table->string('product_code')->unique(); 
+            $table->string('product_code')->unique();
             $table->string('images')->nullable();
             $table->longText('description')->nullable();
-            $table->enum('status', ['approved', 'pending', 'canceled'])->default('pending');
+            $table->enum('status', ['approved', 'pending', 'canceled','unavailable'])->default('pending');
             $table->timestamps();
         });
     }
