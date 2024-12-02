@@ -30,24 +30,20 @@ class CommentController extends Controller
         $formattedComments = $comments->map(function ($comment) {
             return [
                 'id' => $comment->id,
-                'user' => [
-                    'id' => $comment->user->id,
-                    'full_name' => $comment->user->full_name,
-                    'email' => $comment->user->email,
-                    'image' => $comment->user->image ? url('profile/' . $comment->user->image) : url('avatar/profile.png'),
-                ],
-                'comments' => $comment->comments,
+                'user_id' => $comment->user->id,
+                'full_name' => $comment->user->full_name,
+                'email' => $comment->user->email,
+                'image' => $comment->user->image ? url('profile/' . $comment->user->image) : url('avatar/profile.png'),
+                'comment' => $comment->comments,
                 'created_at' => $comment->created_at->toDateTimeString(),
                 'replies' => $comment->replies->map(function ($reply) {
                     return [
                         'id' => $reply->id,
-                        'user' => [
-                            'id' => $reply->user->id,
-                            'full_name' => $reply->user->full_name,
-                            'email' => $reply->user->email,
-                            'image' => $reply->user->image ? url('profile/' . $reply->user->image) : url('avatar/profile.png'),
-                        ],
-                        'comments' => $reply->comments,
+                        'user_id' => $reply->user->id,
+                        'full_name' => $reply->user->full_name,
+                        'email' => $reply->user->email,
+                        'image' => $reply->user->image ? url('profile/' . $reply->user->image) : url('avatar/profile.png'),
+                        'comment' => $reply->comments,
                         'created_at' => $reply->created_at->toDateTimeString(),
                     ];
                 }),
