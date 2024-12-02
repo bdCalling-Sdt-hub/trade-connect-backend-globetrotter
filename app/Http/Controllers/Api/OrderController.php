@@ -244,6 +244,8 @@ class OrderController extends Controller
             $order->save();
             $product = $order->product;
             $productOwner = $product->user;
+            $product->status = 'unavailable';
+            $product->save();
             $productOwner->balance += $order->product->price;
             $productOwner->save();
              Wallet::create([

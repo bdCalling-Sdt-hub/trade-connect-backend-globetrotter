@@ -16,42 +16,43 @@ class CommentController extends Controller
 {
     public function getComment($newsfeedId)
     {
-        $newsfeed = NewsFeed::find($newsfeedId);
-        if (!$newsfeed) {
-            return $this->sendError('Newsfeed not found.', [], 404);
-        }
-        $comments = Comment::where('newsfeed_id', $newsfeedId)
-                            ->with(['user', 'replies.user'])
-                            ->orderBy('created_at', 'asc')
-                            ->get();
-        if ($comments->isEmpty()) {
-            return $this->sendResponse([], 'No comments found for this newsfeed.');
-        }
-        $formattedComments = $comments->map(function ($comment) {
-            return [
-                'id' => $comment->id,
-                'user_id' => $comment->user->id,
-                'full_name' => $comment->user->full_name,
-                'email' => $comment->user->email,
-                'image' => $comment->user->image ? url('profile/' . $comment->user->image) : url('avatar/profile.png'),
-                'comment' => $comment->comments,
-                'created_at' => $comment->created_at->toDateTimeString(),
+        // Retrieve comments for the specific news feed, including replies
+        $comments = Comment::with('user', 'replies.user') // Load user for each comment and reply
+            ->where('newsfeed_id', $newsfeedId)
+            ->whereNull('parent_id') // Only top-level comments
+            ->get()
+            ->map(function ($comment) {
+                return [
+                    'id' => $comment->id,
+                    'user_id' => $comment->user->id,
+                    'full_name' => $comment->user->full_name,
+                    'email' => $comment->user->email,
+                    'image' => $comment->user->image ? url('profile/' . $comment->user->image) : url('avatar/profile.png'),
+                    'comment' => $comment->comments,
+                    'created_at' => $comment->created_at->toDateTimeString(),
 
-                'replies' => $comment->replies->map(function ($reply) {
-                    return [
-                        'id' => $reply->id,
-                        'user_id' => $reply->user->id,
-                        'full_name' => $reply->user->full_name,
-                        'email' => $reply->user->email,
-                        'image' => $reply->user->image ? url('profile/' . $reply->user->image) : url('avatar/profile.png'),
-                        'comment' => $reply->comments,
-                        'created_at' => $reply->created_at->toDateTimeString(),
-                    ];
-                }),
-            ];
-        });
-        return $this->sendResponse($formattedComments, 'Comments retrieved successfully.');
+                    'replies' => $comment->replies->map(function ($reply) {
+                        return [
+                            'id' => $reply->id,
+                            'user_id' => $reply->user->id,
+                            'full_name' => $reply->user->full_name,
+                            'email' => $reply->user->email,
+                            'image' => $reply->user->image ? url('profile/' . $reply->user->image) : url('avatar/profile.png'),
+                            'comment' => $reply->comments,
+                            'created_at' => $reply->created_at->toDateTimeString(),
+                        ];
+                    }),
+                ];
+            });
+
+        // Return the response
+        return response()->json([
+            'success' => true,
+            'data' => $comments,
+            'message' => 'Comments retrieved successfully',
+        ], 200);
     }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(),[
