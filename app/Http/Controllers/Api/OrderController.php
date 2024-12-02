@@ -65,7 +65,7 @@ class OrderController extends Controller
                 return [
                     'order_id'      => $order->id,
                     'total_amount'  => $order->total_amount,
-                    'status'        => $order->status,
+                    'status'        => ucfirst($order->status),
                     'created_at'    => $order->created_at->format('Y-m-d H:i:s'),
                     'phone_number'  => $order->phone_number,
                     'address'       => [
@@ -133,7 +133,7 @@ class OrderController extends Controller
                 return [
                     'order_id'      => $order->id,
                     'total_amount'  => $order->total_amount,
-                    'status'        => $order->status,
+                    'status'        => ucfirst($order->status),
                     'created_at'    => $order->created_at->format('Y-m-d H:i:s'),
                     'user'          =>[
                         'id'        =>$order->user->id,
@@ -250,7 +250,7 @@ class OrderController extends Controller
                 "user_id" => $order->user_id,
                 "amount" => $order->total_amount,
                 "total_love" => $order->product->price,
-                "payment_method" => $request->payment_method ?? 'manual...',
+                "payment_method" => $request->payment_method ?? 'manual',
                 "status" => "purchage"
             ]);
             return $this->sendResponse($order, 'Delivery accepted successfully.');
@@ -275,7 +275,7 @@ class OrderController extends Controller
             if ($order->status == 'rejectDelivery' || $order->status=='canceled') {
                 return response()->json(['message' => 'This order has already been rejected.'], 200);
             }
-          
+
             $order->status = 'rejectDelivery';
             $order->save();
             $order->product->user->notify(new OrderRejectedNotification($order));
@@ -317,7 +317,7 @@ class OrderController extends Controller
                 'zipcode' => $order->zipcode,
                 'address' => $order->address,
                 'notes' => $order->notes,
-                'status' => $order->status,
+                'status' => ucfirst($order->status),
                 'created_at' => $order->created_at->toIso8601String(),
                 'updated_at' => $order->updated_at->toIso8601String(),
                 'user' => [
