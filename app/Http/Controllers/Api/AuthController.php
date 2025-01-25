@@ -35,14 +35,17 @@ class AuthController extends Controller
             return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
         $user = auth()->user();
+        $oldImagePath = $user->image;
         if ($request->hasFile('image')) {
+            $oldImagePath = public_path( $user->image);
+            if ($user->image && file_exists($oldImagePath)) {
+                unlink($oldImagePath);
+            }
             $imagePath = time() . '.' . $request->image->getClientOriginalExtension();
             $request->image->move(public_path('profile'), $imagePath);
-            $image =$imagePath;
+            $user->image = $imagePath;
         }
-        $user->image = $image ?? $user->image;
         $user->save();
-
         return $this->sendResponse($user, 'Profile updated successfully.');
     }
     public function socialLogin(Request $request)
@@ -197,7 +200,11 @@ class AuthController extends Controller
             'email'      => 'required|email|unique:users,email',
             'password'   => 'required|min:8|max:60',
             'address'    => 'required|string|max:255',
-            'role'       => ['required', Rule::in(['MEMBER', 'ADMIN'])],
+            'country'    => 'required|string|max:255',
+            'city'      => 'required|string|max:255',
+            'state'     => 'required|string|max:255',
+            'zip_code'  => 'required|string|max:255',
+            'role'      => ['required', Rule::in(['MEMBER', 'ADMIN'])],
         ]);
         if ($validator->fails()) {
             return response()->json(['error' => 'Validation Error.', 'messages' => $validator->errors()], 422);
@@ -422,6 +429,10 @@ class AuthController extends Controller
             'privacy'=>$user->privacy ??'',
             'location' => $user->location,
             'contact' => $user->contact,
+            'country' => $user->country,
+            'city' => $user->city,
+            'state' => $user->state,
+            'zip_code' => $user->zip_code,
             'image' => $imageUrl,
             'shop' => $shop ? [
                 'shop_name' => $shop->shop_name,
@@ -452,11 +463,15 @@ class AuthController extends Controller
             return $this->sendError([],"You are not user.");
         }
         $validator = Validator::make($request->all(), [
-            'full_name' => 'nullable|string|max:255',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
-            'location' => 'nullable|string|max:255',
-            'bio' => 'nullable|string|max:255',
+            'full_name'=> 'nullable|string|max:255',
+            'image'   => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            'location'=> 'nullable|string|max:255',
+            'bio'     => 'nullable|string|max:255',
             'contact' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'city'    => 'nullable|string|max:255',
+            'state'   => 'nullable|string|max:255',
+            'zip_code'=> 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -478,6 +493,10 @@ class AuthController extends Controller
         $user->location = $request->location ?? $user->location;
         $user->bio = $request->bio ?? $user->bio;
         $user->contact = $request->contact ?? $user->contact;
+        $user->country = $request->country ?? $user->country;
+        $user->city = $request->city ?? $user->city;
+        $user->state = $request->state ?? $user->state;
+        $user->zip_code = $request->zip_code ?? $user->zip_code;
         $user->save();
         return $this->sendResponse($user, 'Profile updated successfully.');
     }

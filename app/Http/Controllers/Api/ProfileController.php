@@ -86,6 +86,7 @@ class ProfileController extends Controller
             return [
                 'id'              => $newsFeed->id,
                 'content'         => $newsFeed->share_your_thoughts,
+                'privacy'         => $newsFeed->privacy,
                 'image_count'     => count($decodedImages),
                 'images'          => collect($decodedImages)->map(function ($image) {
                     return [
@@ -252,6 +253,7 @@ class ProfileController extends Controller
             return [
                 'id'          => $newsFeed->id,
                 'content'     => $newsFeed->share_your_thoughts,
+                'privacy'     => $newsFeed->privacy,
                 'image_count' => count($decodedImages),
                 'images'      => collect(json_decode($newsFeed->images))->map(function ($image) {
                                         return [

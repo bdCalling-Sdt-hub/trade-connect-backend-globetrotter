@@ -22,19 +22,15 @@ class NewsFeedController extends Controller
         $user = Auth::user();
         $newsFeedsQuery = NewsFeed::with(['user', 'likes', 'comments', 'comments.replies'])
         ->where(function($query) use ($user) {
-            // Include news feeds that are public or belong to friends
             $query->where('privacy', 'public')
                   ->orWhere(function($query) use ($user) {
                       $query->where('privacy', 'friends')
                             ->whereHas('user', function ($query) use ($user) {
-                                // Ensure the user is friends with the authenticated user
                                 $query->whereIn('users.id', $user->userFriends()->pluck('friend_id')->toArray());
                             });
                   });
         })
         ->orderBy('id', 'DESC');
-
-    // Execute the query and get the results.
     $newsFeeds = $newsFeedsQuery->get();
     $newsFeeds = $newsFeedsQuery->paginate($request->get('per_page', 20));
         $formattedNewsFeeds = $newsFeeds->getCollection()->transform(function ($newsFeed) use ($user) {
@@ -62,29 +58,6 @@ class NewsFeedController extends Controller
                 'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
                 'created_at' => $newsFeed->created_at->format('Y-m-d H:i:s'),
                 'comment_count'        => $newsFeed->comments->count(),
-                // ->transform(function ($comment) {
-                //     return [
-                //         'id'          => $comment->id,
-                //         'user_id'     => $comment->user_id,
-                //         'full_name'   => $comment->user->full_name,
-                //         'user_name'   => $comment->user->user_name,
-                //         'image'       => $comment->user->image ? url('profile/',$comment->user->image) : url('avatar/profile.png'),
-                //         'comment'     => $comment->comments,
-                //         'created_at'  =>$this->getTimePassed($comment->created_at),
-                //         'reply_count' => $comment->replies->count(),
-                //         'replies'     => $comment->replies->transform(function ($reply){
-                //             return [
-                //                 'id'        => $reply->id,
-                //                 'user_id'   => $reply->user_id,
-                //                 'full_name' => $reply->user->full_name,
-                //                 'user_name' => $reply->user->user_name,
-                //                 'image'     => $reply->user->image ? url('profile/',$reply->user->image) : url('avatar/profile.png'),
-                //                 'comment'   => $reply->comments,
-                //                 'created_at'=> $this->getTimePassed($reply->created_at),
-                //             ];
-                //         })->toArray(),
-                //     ];
-                // })->toArray(),
             ];
         });
         return $this->sendResponse([

@@ -39,7 +39,11 @@ class User extends Authenticatable implements JWTSubject
         'location',
         'privacy',
         'balance',
-        'contact'
+        'contact',
+        'country',
+        'city',
+        'state',
+        'zip_code'
     ];
     protected $casts = [
         'otp_expires_at' => 'datetime',
