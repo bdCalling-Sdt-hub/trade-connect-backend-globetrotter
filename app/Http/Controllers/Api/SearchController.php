@@ -27,7 +27,16 @@ class SearchController extends Controller
     }
     private function post(string $query)
     {
-        $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')->get();
+        $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')
+            ->orWhereHas('user', function ($user) use ($query) {
+                $user->where('country', $query)
+                    ->orWhere('city', $query)
+                    ->orWhere('state', $query)
+                    ->orWhere('zip_code', $query)
+                    ->orWhere('full_name', $query)
+                    ->orWhere('user_name', $query)
+                    ->orWhere('email', $query);
+            })->get();
 
         $user = Auth()->user();
         return $newsfeeds->map(function ($newsFeed) use ($user) {
@@ -40,6 +49,10 @@ class SearchController extends Controller
                     'user_id'   => $userData->id,
                     'full_name' => $userData->full_name,
                     'user_name' => $userData->user_name,
+                    'country' => $userData->country,
+                    'city' => $userData->city,
+                    'state' => $userData->state,
+                    'zip_code' => $userData->zip_code,
                     'image' => $userData->image ? url('profile/', $userData->image) : url('avatar/profile.png'),
                 ],
                 'content'         => $newsFeed->share_your_thoughts,
@@ -82,6 +95,15 @@ class SearchController extends Controller
         $authUserId = Auth::user()->id;
         $products = Product::where('status', 'approved')
                             ->where('product_name', 'like', '%' . $query . '%')
+                            ->orWhereHas('user', function ($user) use ($query) {
+                                $user->where('country', $query)
+                                    ->orWhere('city', $query)
+                                    ->orWhere('state', $query)
+                                    ->orWhere('zip_code', $query)
+                                    ->orWhere('full_name', $query)
+                                    ->orWhere('user_name', $query)
+                                    ->orWhere('email', $query);
+                            })
                             ->whereHas('user', function ($query) use ($authUserId) {
                                 $query->where(function ($query) use ($authUserId) {
                                     $query->where('privacy', 'public') // Include public products
@@ -119,6 +141,10 @@ class SearchController extends Controller
                         'seller_name' => $product->shop->user->full_name,
                         'user_name' => $product->shop->user->user_name,
                         'email' => $product->shop->user->email,
+                        'country' => $product->shop->user->country,
+                        'city' => $product->shop->user->city,
+                        'state' => $product->shop->user->state,
+                        'zip_code' => $product->shop->user->zip_code,
                         'image' => $product->shop->user->image ? url('profile/', $product->shop->user->image) : url('avatar/profile.png'),
                     ],
                 ],
@@ -128,7 +154,12 @@ class SearchController extends Controller
     private function people(string $query)
     {
         $users = User::where('user_name', 'like', '%' . $query . '%')
-                ->orWhere('full_name','like','%'.$query. '%')->get();
+                ->orWhere('full_name','like','%'.$query. '%')
+                ->orWhere('country','like','%'.$query. '%')
+                ->orWhere('city','like','%'.$query. '%')
+                ->orWhere('state','like','%'.$query. '%')
+                ->orWhere('zip_code','like','%'.$query. '%')
+                ->get();
 
         return $users->map(function ($user) {
             return [
@@ -136,6 +167,10 @@ class SearchController extends Controller
                 'full_name' => $user->full_name,
                 'user_name' => $user->user_name,
                 'email' => $user->email,
+                'country' => $user->country,
+                'city' => $user->city,
+                'state' => $user->state,
+                'zip_code' => $user->zip_code,
                 'image' => $user->image ? url('profile/', $user->image) : url('avatar/profile.png'),
             ];
         })->toArray();

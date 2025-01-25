@@ -33,6 +33,10 @@ return new class extends Migration
             $table->string('facebook_id')->nullable();
             $table->string('privacy')->default('public');
             $table->boolean('is_active')->nullable();
+            $table->string('country')->nullable();
+            $table->string('city')->nullable();
+            $table->string('state')->nullable();
+            $table->string('zip_code')->nullable();
             $table->string('status')->nullable();
             $table->rememberToken();
             $table->timestamps();
