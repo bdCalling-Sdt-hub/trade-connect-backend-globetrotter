@@ -14,39 +14,45 @@ class SearchController extends Controller
 {
     public function search(Request $request)
     {
-        $request->validate([
-            'query' => 'required|string|min:1',
-        ]);
-        $query = $request->input('query');
+        $query = $request->input('query','');
+        $filters = [
+            'country' => $request->input('country',''),
+            'city' => $request->input('city',''),
+            'state' => $request->input('state',''),
+            'zip_code' => $request->input('zip_code',''),
+        ];
         $results = [
-            'posts' => $this->post($query),
+            'posts' => $this->post($query,$filters),
             'products' => $this->product($query),
             'people' => $this->people($query),
         ];
         return $this->sendResponse($results, 'Search results retrieved successfully.');
     }
-    private function post(string $query)
+    private function post($query, array $filters = [])
     {
-        $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')
-            ->orWhereHas('user', function ($user) use ($query) {
-                $user->where('country', $query)
-                    ->orWhere('city', $query)
-                    ->orWhere('state', $query)
-                    ->orWhere('zip_code', $query)
-                    ->orWhere('full_name', $query)
-                    ->orWhere('user_name', $query)
-                    ->orWhere('email', $query);
-            })->get();
-
-        $user = Auth()->user();
-        return $newsfeeds->map(function ($newsFeed) use ($user) {
+        $newsfeeds = NewsFeed::with(['user', 'likes', 'comments.replies', 'comments.user', 'likes'])
+            ->where('share_your_thoughts', 'like', '%' . $query . '%');
+        if (!empty($filters['country'])) {
+            $newsfeeds->whereHas('user', fn($user) => $user->where('country', $filters['country']));
+        }
+        if (!empty($filters['city'])) {
+            $newsfeeds->whereHas('user', fn($user) => $user->where('city', $filters['city']));
+        }
+        if (!empty($filters['state'])) {
+            $newsfeeds->whereHas('user', fn($user) => $user->where('state', $filters['state']));
+        }
+        if (!empty($filters['zip_code'])) {
+            $newsfeeds->whereHas('user', fn($user) => $user->where('zip_code', $filters['zip_code']));
+        }
+        $user = auth()->user();
+        return $newsfeeds->get()->map(function ($newsFeed) use ($user) {
             $userData = $newsFeed->user;
-            $decodedImages = json_decode($newsFeed->images);
+            $decodedImages = json_decode($newsFeed->images, true);
 
             return [
-                'newsfeed_id'   => $newsFeed->id,
-                'user'          => [
-                    'user_id'   => $userData->id,
+                'newsfeed_id' => $newsFeed->id,
+                'user' => [
+                    'user_id' => $userData->id,
                     'full_name' => $userData->full_name,
                     'user_name' => $userData->user_name,
                     'country' => $userData->country,
@@ -55,34 +61,34 @@ class SearchController extends Controller
                     'zip_code' => $userData->zip_code,
                     'image' => $userData->image ? url('profile/', $userData->image) : url('avatar/profile.png'),
                 ],
-                'content'         => $newsFeed->share_your_thoughts,
-                'image_count'     => count($decodedImages),
-                'images'          => collect($decodedImages)->map(fn($image) => [
-                                        'url' => $image ? url('NewsFeedImages/', $image) : '',
-                                    ])->toArray(),
+                'content' => $newsFeed->share_your_thoughts,
+                'image_count' => count($decodedImages),
+                'images' => collect($decodedImages)->map(fn($image) => [
+                    'url' => $image ? url('NewsFeedImages/', $image) : '',
+                ])->toArray(),
                 'newsfeed_status' => $newsFeed->status ? 'active' : 'inactive',
-                'like_count'      => $newsFeed->likes->count(),
+                'like_count' => $newsFeed->likes->count(),
                 'auth_user_liked' => $newsFeed->likes->contains('user_id', $user->id),
-                'created_at'      => $newsFeed->created_at->format('Y-m-d H:i:s'),
-                'comments'        => $newsFeed->comments->map(function ($comment) {
+                'created_at' => $newsFeed->created_at->format('Y-m-d H:i:s'),
+                'comments' => $newsFeed->comments->map(function ($comment) {
                     return [
-                        'id'          => $comment->id,
-                        'user_id'     => $comment->user_id,
-                        'full_name'   => $comment->user->full_name,
-                        'user_name'   => $comment->user->user_name,
-                        'image'       => $comment->user->image ? url('Profile/', $comment->user->image) : '',
-                        'comment'     => $comment->comments,
-                        'created_at'  => $this->getTimePassed($comment->created_at),
+                        'id' => $comment->id,
+                        'user_id' => $comment->user_id,
+                        'full_name' => $comment->user->full_name,
+                        'user_name' => $comment->user->user_name,
+                        'image' => $comment->user->image ? url('Profile/', $comment->user->image) : '',
+                        'comment' => $comment->comments,
+                        'created_at' => $this->getTimePassed($comment->created_at),
                         'reply_count' => $comment->replies->count(),
-                        'replies'     => $comment->replies->map(function ($reply) {
+                        'replies' => $comment->replies->map(function ($reply) {
                             return [
-                                'id'        => $reply->id,
-                                'user_id'   => $reply->user_id,
+                                'id' => $reply->id,
+                                'user_id' => $reply->user_id,
                                 'full_name' => $reply->user->full_name,
                                 'user_name' => $reply->user->user_name,
-                                'image'     => $reply->user->image ? url('Profile/', $reply->user->image) : '',
-                                'comment'   => $reply->comments,
-                                'created_at'=> $this->getTimePassed($reply->created_at),
+                                'image' => $reply->user->image ? url('Profile/', $reply->user->image) : '',
+                                'comment' => $reply->comments,
+                                'created_at' => $this->getTimePassed($reply->created_at),
                             ];
                         })->toArray(),
                     ];
@@ -90,35 +96,36 @@ class SearchController extends Controller
             ];
         })->toArray();
     }
-    private function product(string $query)
+    private function product( $query, array $filters = [])
     {
-        $authUserId = Auth::user()->id;
+        $authUserId = Auth::id();
         $products = Product::where('status', 'approved')
-                            ->where('product_name', 'like', '%' . $query . '%')
-                            ->orWhereHas('user', function ($user) use ($query) {
-                                $user->where('country', $query)
-                                    ->orWhere('city', $query)
-                                    ->orWhere('state', $query)
-                                    ->orWhere('zip_code', $query)
-                                    ->orWhere('full_name', $query)
-                                    ->orWhere('user_name', $query)
-                                    ->orWhere('email', $query);
-                            })
-                            ->whereHas('user', function ($query) use ($authUserId) {
-                                $query->where(function ($query) use ($authUserId) {
-                                    $query->where('privacy', 'public')
-                                        ->orWhere(function ($query) use ($authUserId) {
-                                            $query->where('privacy', 'friends')
-                                                ->whereHas('friends', function ($friendQuery) use ($authUserId) {
-                                                    $friendQuery->where('friend_id', $authUserId)
-                                                        ->where('is_accepted', true); 
-                                                });
-                                        });
+            ->where('product_name', 'like', '%' . $query . '%')
+            ->whereHas('user', function ($query) use ($authUserId) {
+                $query->where(function ($privacyQuery) use ($authUserId) {
+                    $privacyQuery->where('privacy', 'public')
+                        ->orWhere(function ($friendsQuery) use ($authUserId) {
+                            $friendsQuery->where('privacy', 'friends')
+                                ->whereHas('friends', function ($friendQuery) use ($authUserId) {
+                                    $friendQuery->where('friend_id', $authUserId)
+                                        ->where('is_accepted', true);
                                 });
-                            })
-                            ->orderBy('id','desc')
-                            ->paginate(20);
-
+                        });
+                });
+            });
+        if (!empty($filters['country'])) {
+            $products->whereHas('user', fn($userQuery) => $userQuery->where('country', $filters['country']));
+        }
+        if (!empty($filters['city'])) {
+            $products->whereHas('user', fn($userQuery) => $userQuery->where('city', $filters['city']));
+        }
+        if (!empty($filters['state'])) {
+            $products->whereHas('user', fn($userQuery) => $userQuery->where('state', $filters['state']));
+        }
+        if (!empty($filters['zip_code'])) {
+            $products->whereHas('user', fn($userQuery) => $userQuery->where('zip_code', $filters['zip_code']));
+        }
+        $products = $products->orderBy('id', 'desc')->paginate(20);
         return $products->map(function ($product) {
             return [
                 'id' => $product->id,
@@ -132,36 +139,42 @@ class SearchController extends Controller
                 'price' => $product->price,
                 'description' => $product->description ?? 'N/A',
                 'created_at' => $product->created_at->format('Y-m-d H:i:s'),
-                'product_images' => collect(json_decode($product->images))->map(function ($image) {
-                    return $image ? url("products/", $image) : url('avatar/product.png');
-                }),
+                'product_images' => collect(json_decode($product->images))->map(fn($image) => $image ? url("products/", $image) : url('avatar/product.png')),
                 'shop' => [
-                    'shop_name' => $product->shop->shop_name,
+                    'shop_name' => $product->shop->shop_name ?? 'N/A',
                     'seller' => [
-                        'seller_name' => $product->shop->user->full_name,
-                        'user_name' => $product->shop->user->user_name,
-                        'email' => $product->shop->user->email,
-                        'country' => $product->shop->user->country,
-                        'city' => $product->shop->user->city,
-                        'state' => $product->shop->user->state,
-                        'zip_code' => $product->shop->user->zip_code,
+                        'seller_name' => $product->shop->user->full_name ?? 'N/A',
+                        'user_name' => $product->shop->user->user_name ?? 'N/A',
+                        'email' => $product->shop->user->email ?? 'N/A',
+                        'country' => $product->shop->user->country ?? 'N/A',
+                        'city' => $product->shop->user->city ?? 'N/A',
+                        'state' => $product->shop->user->state ?? 'N/A',
+                        'zip_code' => $product->shop->user->zip_code ?? 'N/A',
                         'image' => $product->shop->user->image ? url('profile/', $product->shop->user->image) : url('avatar/profile.png'),
                     ],
                 ],
             ];
         })->toArray();
     }
-    private function people(string $query)
+    private function people($query, array $filters = [])
     {
-        $users = User::where('user_name', 'like', '%' . $query . '%')
-                ->orWhere('full_name','like','%'.$query. '%')
-                ->orWhere('country','like','%'.$query. '%')
-                ->orWhere('city','like','%'.$query. '%')
-                ->orWhere('state','like','%'.$query. '%')
-                ->orWhere('zip_code','like','%'.$query. '%')
-                ->get();
-
-        return $users->map(function ($user) {
+        $users = User::where('role','MEMBER')->where(function ($userQuery) use ($query) {
+            $userQuery->where('user_name', 'like', '%' . $query . '%')
+                ->orWhere('full_name', 'like', '%' . $query . '%');
+        });
+        if (!empty($filters['country'])) {
+            $users->where('country', $filters['country']);
+        }
+        if (!empty($filters['city'])) {
+            $users->where('city', $filters['city']);
+        }
+        if (!empty($filters['state'])) {
+            $users->where('state', $filters['state']);
+        }
+        if (!empty($filters['zip_code'])) {
+            $users->where('zip_code', $filters['zip_code']);
+        }
+        return $users->get()->map(function ($user) {
             return [
                 'id' => $user->id,
                 'full_name' => $user->full_name,
@@ -175,7 +188,6 @@ class SearchController extends Controller
             ];
         })->toArray();
     }
-
     protected function getTimePassed($createdAt)
     {
         $now = Carbon::now();
