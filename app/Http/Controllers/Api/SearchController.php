@@ -106,12 +106,12 @@ class SearchController extends Controller
                             })
                             ->whereHas('user', function ($query) use ($authUserId) {
                                 $query->where(function ($query) use ($authUserId) {
-                                    $query->where('privacy', 'public') // Include public products
+                                    $query->where('privacy', 'public')
                                         ->orWhere(function ($query) use ($authUserId) {
-                                            $query->where('privacy', 'friends') // Include friends-only products
+                                            $query->where('privacy', 'friends')
                                                 ->whereHas('friends', function ($friendQuery) use ($authUserId) {
                                                     $friendQuery->where('friend_id', $authUserId)
-                                                        ->where('is_accepted', true); // Check accepted friendship
+                                                        ->where('is_accepted', true); 
                                                 });
                                         });
                                 });
