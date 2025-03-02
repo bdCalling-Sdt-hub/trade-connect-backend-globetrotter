@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -55,6 +56,7 @@ class AuthController extends Controller
             'email' => 'required|email|max:255',
             'google_id' => 'string|nullable',
             'facebook_id' => 'string|nullable',
+            'image'=>'nullable|string'
         ]);
         if ($validator->fails()) {
             return response()->json($validator->errors(), 400);
@@ -77,11 +79,21 @@ class AuthController extends Controller
                 return $this->responseWithToken($token);
             }
         }
+        $image = null;
+            if ($request->has('image')) {
+                $imageUrl = $request->image;
+                $imageContent = Http::get($imageUrl);
+                $imageName = time() . '.jpg';
+                $imagePath = public_path('profile/' . $imageName);
+                file_put_contents($imagePath, $imageContent->body());
+                $image =$imageName;
+            }
         $user = User::create([
             'full_name' => $request->full_name,
             'user_name' => Str::lower($request->full_name),
             'email' => $request->email,
             'password' => Hash::make(Str::random(16)),
+            'image'=>$image,
             'role' => 'MEMBER',
             'google_id' => $request->google_id ?? null,
             'facebook_id' => $request->facebook_id ?? null,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\NewsFeed;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class SearchController extends Controller
     {
         $query = $request->input('query', '');
         $filters = [
+            'shop_name' => $request->input('shop_name', ''),
             'country' => $request->input('country', ''),
             'city' => $request->input('city', ''),
             'state' => $request->input('state', ''),
@@ -25,9 +27,31 @@ class SearchController extends Controller
             'posts' => $this->post($query, $filters),
             'products' => $this->product($query, $filters),
             'people' => $this->people($query, $filters),
+            'shops' => $this->shops($query, $filters),
         ];
-
         return $this->sendResponse($results, 'Search results retrieved successfully.');
+    }
+    private function shops($query, $filters = [])
+    {
+        $shops = Shop::with(['user'])
+            ->where('shop_name', 'like', '%' . $query . '%');
+        foreach (['shop_name','country', 'city', 'state', 'zip_code'] as $filterKey) {
+            if (!empty($filters[$filterKey])) {
+                $shops->where($filterKey, $filters[$filterKey]);
+            }
+        }
+        $shops = $shops->paginate(20);
+
+        return $shops->map(function ($shop) {
+            return [
+                'id' => $shop->id,
+                'shop_name' => $shop->shop_name,
+                'logo' => $shop->logo ? url('logos/', $shop->logo) : url('avatar/logo.png'),
+                'seller' => $this->mapUser($shop->user),
+                'product_count' => $shop->products->count(),
+                'created_at' => $shop->created_at->format('Y-m-d H:i:s'),
+            ];
+        });
     }
     private function post($query, $filters = [])
     {
@@ -36,15 +60,12 @@ class SearchController extends Controller
             'likes',
             'comments.replies.user:id,full_name,user_name,image',
         ])->where('share_your_thoughts', 'like', '%' . $query . '%');
-        // Apply dynamic filters
         foreach (['country', 'city', 'state', 'zip_code'] as $filterKey) {
             if (!empty($filters[$filterKey])) {
                 $newsfeeds->whereHas('user', fn($user) => $user->where($filterKey, $filters[$filterKey]));
             }
         }
-        // Paginate results
         $newsfeeds = $newsfeeds->paginate(20);
-        // Map results
         $user = auth()->user();
         return $newsfeeds->map(function ($newsFeed) use ($user) {
             return [
@@ -145,6 +166,7 @@ class SearchController extends Controller
             $userQuery->where('user_name', 'like', '%' . $query . '%')
                 ->orWhere('full_name', 'like', '%' . $query . '%');
         });
+
         if (!empty($filters['country'])) {
             $users->where('country', $filters['country']);
         }

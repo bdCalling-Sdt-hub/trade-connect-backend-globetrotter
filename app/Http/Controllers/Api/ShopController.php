@@ -17,8 +17,8 @@ class ShopController extends Controller
         if (!$shop) {
             return response()->json([
                 'data'=>[],
-                'message'=>"No shop found.",
-                'status'=>404
+                'message'=>"No shops found.",
+                'status'=>200
             ]);
         }
         return $this->sendResponse($shop, "User shop fetched successfully.");
@@ -68,7 +68,7 @@ class ShopController extends Controller
         $shop->status = $request->status ?? true;
         $shop->save();
 
-        return $this->sendResponse($shop, 'Shop created successfully.', 201); // Load user relationship
+        return $this->sendResponse($shop, 'Shop created successfully.'); // Load user relationship
     }
     public function show($id)
     {
@@ -114,6 +114,12 @@ class ShopController extends Controller
         $shop = Shop::find($id);
         if (!$shop) {
             return $this->sendError('Shop not found', [], 404);
+        }
+        if ($shop->logo) {
+            $oldLogoPath = public_path('logos/' . $shop->logo);
+            if (file_exists($oldLogoPath)) {
+                unlink($oldLogoPath);
+            }
         }
         $shop->delete();
         return $this->sendResponse([], 'Shop deleted successfully.');
