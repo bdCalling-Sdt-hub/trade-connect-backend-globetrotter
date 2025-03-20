@@ -104,7 +104,7 @@ class NewsFeedController extends Controller
         $imagePaths = [];
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
-                $filename = time() . '_' . $image->getClientOriginalName();
+                $filename = time() . '_' . $image->getClientOriginalExtension();
                 $image->move(public_path('NewsFeedImages'), $filename);
                 $imagePaths[] =$filename;
             }
@@ -147,7 +147,7 @@ class NewsFeedController extends Controller
             }
             $imagePaths = [];
             foreach ($request->file('images') as $image) {
-                $filename = time() . '_' . $image->getClientOriginalName();
+                $filename = time() . '_' . $image->getClientOriginalExtension();
                 $path = $image->move(public_path('NewsFeedImages'), $filename);
                 $imagePaths[] =$filename;
             }

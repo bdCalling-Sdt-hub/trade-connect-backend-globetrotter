@@ -15,6 +15,7 @@ class SearchController extends Controller
 {
     public function search(Request $request)
     {
+
         $query = $request->input('query', '');
         $filters = [
             'shop_name' => $request->input('shop_name', ''),
@@ -23,12 +24,30 @@ class SearchController extends Controller
             'state' => $request->input('state', ''),
             'zip_code' => $request->input('zip_code', ''),
         ];
-        $results = [
-            'posts' => $this->post($query, $filters),
-            'products' => $this->product($query, $filters),
-            'people' => $this->people($query, $filters),
-            'shops' => $this->shops($query, $filters),
-        ];
+
+        $searchType = $request->input('type', 'posts'); // Default to 'posts' if type is not provided
+        switch ($searchType) {
+            case 'posts':
+                $results['posts'] = $this->post($query, $filters);
+                break;
+
+            case 'products':
+                $results['products'] = $this->product($query, $filters);
+                break;
+
+            case 'people':
+                $results['people'] = $this->people($query, $filters);
+                break;
+
+            case 'shops':
+                $results['shops'] = $this->shops($query, $filters);
+                break;
+
+            default:
+                // Handle invalid type
+                return $this->sendResponse([], 'Invalid search type.', 400);
+        }
+
         return $this->sendResponse($results, 'Search results retrieved successfully.');
     }
     private function shops($query, $filters = [])
@@ -217,26 +236,64 @@ class SearchController extends Controller
     }
     public function newsfeed(Request $request)
     {
-        $request->validate([
-            'query' => 'required|string|min:1',
-        ]);
+        // Get the search query and user_id from the request
         $query = $request->input('query');
+        $userId = $request->input('user_id', Auth::id());
 
-        $newsfeeds = NewsFeed::where('share_your_thoughts', 'like', '%' . $query . '%')
-            ->orWhere('user_id', Auth::id())
-            ->get();
-        if(!$newsfeeds){
-            return $this->sendError([],"No NewsFeed Found.");
+        // Start the query builder for NewsFeed
+        $newsfeedsQuery = NewsFeed::query();
+
+        // Apply the filter for the share_your_thoughts column if a query is provided
+        if ($query) {
+            $newsfeedsQuery->where('share_your_thoughts', 'like', '%' . $query . '%');
         }
-        return $this->sendResponse($newsfeeds, 'Successfully retrieved newsfeeds.');
+
+        // Apply the filter for the user_id
+        $newsfeedsQuery->where('user_id', $userId);
+
+        // Fetch the paginated newsfeeds
+        $newsfeeds = $newsfeedsQuery->paginate(10); // You can adjust the number of items per page as needed
+
+        // If no newsfeeds are found, return an error
+        if ($newsfeeds->isEmpty()) {
+            return $this->sendError([], "No NewsFeed Found.");
+        }
+
+        // Format the newsfeeds with images and other necessary fields
+        $formattedNewsfeeds = $newsfeeds->map(function ($newsfeed) {
+            // Parse the images field (JSON array of image names) and return URLs
+            $imageUrls = collect(json_decode($newsfeed->images))->map(function ($image) {
+                return $image ? url('NewsFeedImages/' . $image) : ''; // Return empty if no image
+            });
+
+            return [
+                'id' => $newsfeed->id,
+                'user_id' => $newsfeed->user_id,
+                'share_your_thoughts' => $newsfeed->share_your_thoughts,
+                'images' => $imageUrls,  // Return parsed image URLs
+                'privacy' => $newsfeed->privacy,
+                'status' => $newsfeed->status,
+                'created_at' => $newsfeed->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $newsfeed->updated_at->format('Y-m-d H:i:s'),
+            ];
+        });
+
+        // Return the formatted newsfeeds with pagination metadata
+        return $this->sendResponse([
+            'newsfeeds' => $formattedNewsfeeds,
+            'pagination' => [
+                'total' => $newsfeeds->total(),
+                'current_page' => $newsfeeds->currentPage(),
+                'last_page' => $newsfeeds->lastPage(),
+                'per_page' => $newsfeeds->perPage(),
+                'from' => $newsfeeds->firstItem(),
+                'to' => $newsfeeds->lastItem(),
+            ]
+        ], 'Successfully retrieved newsfeeds.');
     }
     public function products(Request $request)
     {
-        $request->validate([
-            'query' => 'required|string|min:1',
-        ]);
         $query = $request->input('query');
-
         $products = Product::where('product_name', 'like', '%' . $query . '%')
             ->orWhere('description', 'like', '%' . $query . '%')
             ->get();

@@ -116,6 +116,7 @@ Route::group(['middleware' => ['api', 'jwt.auth','member']], function () {
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::apiResource('shops', ShopController::class);
     Route::get('user-shop', [ShopController::class,'userShop']);
+    Route::get('another-user-shop', [ShopController::class,'anotherUserShop']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::post('/support', [SupportController::class, 'support']);
@@ -129,7 +130,7 @@ Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
     Route::get('/search', [SearchController::class, 'search']);
     Route::get('/all', [SearchController::class, 'all']);
-    Route::get('/post', [SearchController::class, 'newsfeed']);
+    Route::get('/newsfeed', [SearchController::class, 'newsfeed']);
     Route::get('/product', [SearchController::class, 'products']);
 });
 Route::middleware(['api', 'jwt.auth','member'])->prefix('')->group(function () {
