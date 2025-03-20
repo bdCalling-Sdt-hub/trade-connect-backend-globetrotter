@@ -135,7 +135,7 @@ class ShopController extends Controller
             'id' => $shop->id,
             'user_id' => $shop->user_id,
             'shop_name' => $shop->shop_name,
-            'logo_url' => $logoUrl,
+            'logo' => $logoUrl,
             'status' => $shop->status,
             'approved_products_count' => $approvedProductsCount,
             'pending_products_count' => $pendingProductsCount,
