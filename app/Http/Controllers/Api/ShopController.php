@@ -91,6 +91,20 @@ class ShopController extends Controller
                 'description' => $product->description,
                 'created_at' => $product->created_at->format('Y-m-d H:i:s'),
                 'product_images' => $imageUrls,
+                'shop' => [
+                    'shop_name' => $product->shop->shop_name,
+                    'logo' => $product->shop->logo
+                            ? url('logos/',$product->shop->logo)
+                            : url('avatar/logo.png'),
+                    'seller' => [
+                        'seller_name' => $product->shop->user->full_name,
+                        'user_name' => $product->shop->user->user_name,
+                        'email' => $product->shop->user->email,
+                        'image' =>$product->shop->user->image
+                            ? url('profile/',$product->shop->user->image)
+                            : url('avatar/profile.png')
+                    ],
+                ],
             ];
         });
         $pendingProductDetails = $pendingProducts->map(function ($product) {
